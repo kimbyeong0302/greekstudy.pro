@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관리자</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; background:#f4f1ea; color:#222; }
+.screen { max-width: 640px; margin: 0 auto; padding: 24px 16px 72px; }
+.top { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+h1 { font-size: 20px; margin:0; font-weight:700; }
+#logoutBtn { font-size:12px; color:#888; background:none; border:1px solid #ddd; border-radius:8px; padding:6px 10px; cursor:pointer; }
+.card { background:#fff; border-radius:16px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
+.card-title { font-size:11px; font-weight:700; color:#aaa; letter-spacing:0.8px; text-transform:uppercase; margin:0 0 12px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th, td { text-align:left; padding:6px 4px; border-bottom:1px solid #eee; }
+.badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#eaf1fd; color:#2e6ed6; }
+.empty { color:#999; font-size:13px; text-align:center; padding:12px 0; }
+.stat-row { display:flex; gap:10px; }
+.stat { flex:1; background:#fff; border-radius:14px; padding:16px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
+.stat .n { font-size:22px; font-weight:800; color:#2e6ed6; }
+.stat .l { font-size:12px; color:#888; margin-top:4px; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="top">
+    <h1>관리자 대시보드 <span class="badge">전체 보기</span></h1>
+    <button id="logoutBtn">로그아웃</button>
+  </div>
+
+  <div class="stat-row" id="statRow" style="margin-bottom:14px"></div>
+
+  <div class="card">
+    <div class="card-title">전체 교수</div>
+    <div id="profTable" class="empty">불러오는 중...</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">전체 그룹(과목)</div>
+    <div id="groupTable" class="empty">불러오는 중...</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">전체 학생</div>
+    <div id="studentTable" class="empty">불러오는 중...</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">전체 시험 및 응시 현황</div>
+    <div id="examTable" class="empty">불러오는 중...</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script>
+async function init() {
+  const session = await Auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+  const role = await Auth.getRole(session.user.id);
+  if (role !== 'admin') { window.location.href = 'index.html'; return; }
+
+  const [{ data: profs }, { data: groups }, { data: students }, { data: exams }] = await Promise.all([
+    Api.adminAllProfessors(), Api.adminAllGroups(), Api.adminAllStudents(), Api.adminAllExamsWithAttemptCount()
+  ]);
+
+  document.getElementById('statRow').innerHTML = `
+    <div class="stat"><div class="n">${(profs||[]).length}</div><div class="l">교수</div></div>
+    <div class="stat"><div class="n">${(groups||[]).length}</div><div class="l">그룹</div></div>
+    <div class="stat"><div class="n">${(students||[]).length}</div><div class="l">학생</div></div>
+    <div class="stat"><div class="n">${(exams||[]).length}</div><div class="l">시험</div></div>
+  `;
+
+  const profEl = document.getElementById('profTable');
+  profEl.innerHTML = (!profs || profs.length === 0) ? '' : `<table><tr><th>이름</th><th>이메일</th><th>가입일</th></tr>` +
+    profs.map(p => `<tr><td>${p.name}</td><td>${p.email}</td><td>${new Date(p.created_at).toLocaleDateString('ko-KR')}</td></tr>`).join('') + `</table>`;
+  if (!profs || profs.length === 0) profEl.textContent = '아직 없습니다.';
+
+  const groupEl = document.getElementById('groupTable');
+  if (!groups || groups.length === 0) { groupEl.textContent = '아직 없습니다.'; }
+  else groupEl.innerHTML = `<table><tr><th>그룹명</th><th>담당 교수</th><th>가입코드</th></tr>` +
+    groups.map(g => `<tr><td>${g.name}</td><td>${g.professors ? g.professors.name : ''}</td><td>${g.join_code}</td></tr>`).join('') + `</table>`;
+
+  const studentEl = document.getElementById('studentTable');
+  if (!students || students.length === 0) { studentEl.textContent = '아직 없습니다.'; }
+  else studentEl.innerHTML = `<table><tr><th>학번</th><th>이름</th><th>구분</th></tr>` +
+    students.map(s => `<tr><td>${s.student_number}</td><td>${s.name}</td><td>${s.role === 'admin' ? '관리자' : '학생'}</td></tr>`).join('') + `</table>`;
+
+  const examEl = document.getElementById('examTable');
+  if (!exams || exams.length === 0) { examEl.textContent = '아직 없습니다.'; }
+  else examEl.innerHTML = `<table><tr><th>그룹</th><th>주차</th><th>단계</th><th>응시 수</th></tr>` +
+    exams.map(e => `<tr><td>${e.groups ? e.groups.name : ''}</td><td>${e.weeks.join(',')}</td><td>${e.level}단계</td><td>${e.attempts && e.attempts[0] ? e.attempts[0].count : 0}</td></tr>`).join('') + `</table>`;
+}
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await Auth.signOut();
+  window.location.href = 'index.html';
+});
+
+init();
+</script>
+</body>
+</html>

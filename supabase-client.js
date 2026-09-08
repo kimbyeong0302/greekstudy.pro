@@ -13,7 +13,26 @@ function studentEmail(studentNumber) {
   return `s${studentNumber}@students.greekquiz.local`;
 }
 
+// 학생은 실제 이메일이 없어서(가짜 이메일) 인증 메일을 받을 방법이 없으므로,
+// 학생 계정만 Edge Function(signup)으로 즉시 활성화 상태로 만듭니다.
+async function callSignupFunction(payload) {
+  const res = await fetch(SUPABASE_URL + '/functions/v1/signup', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+    },
+    body: JSON.stringify(payload)
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || '회원가입에 실패했습니다.');
+  return json;
+}
+
 const Auth = {
+  // 교수는 실제 이메일을 쓰므로, 토블 앱과 동일하게 Supabase의 기본 이메일 인증
+  // 절차(가입 → 인증 메일의 링크 클릭 → 로그인)를 그대로 사용합니다.
   async signUpProfessor(email, password, name) {
     return sb.auth.signUp({
       email, password,
@@ -21,11 +40,12 @@ const Auth = {
     });
   },
   async signUpStudent(studentNumber, name, password) {
-    return sb.auth.signUp({
-      email: studentEmail(studentNumber),
-      password,
-      options: { data: { role: 'student', name, student_number: studentNumber } }
-    });
+    try {
+      await callSignupFunction({ role: 'student', studentNumber, name, password });
+      return { error: null };
+    } catch (err) {
+      return { error: err };
+    }
   },
   async signInProfessor(email, password) {
     return sb.auth.signInWithPassword({ email, password });
@@ -40,12 +60,12 @@ const Auth = {
     const { data } = await sb.auth.getSession();
     return data.session;
   },
-  // 로그인한 사용자가 교수인지 학생인지 확인 (프로필 테이블 존재 여부로 판단)
+  // 로그인한 사용자가 교수/학생/관리자 중 무엇인지 확인
   async getRole(userId) {
     const { data: prof } = await sb.from('professors').select('id').eq('id', userId).maybeSingle();
     if (prof) return 'professor';
-    const { data: stu } = await sb.from('students').select('id').eq('id', userId).maybeSingle();
-    if (stu) return 'student';
+    const { data: stu } = await sb.from('students').select('id, role').eq('id', userId).maybeSingle();
+    if (stu) return stu.role === 'admin' ? 'admin' : 'student';
     return null;
   }
 };
@@ -108,5 +128,19 @@ const Api = {
   },
   async myAttempt(examId, studentId) {
     return sb.from('attempts').select('*').eq('exam_id', examId).eq('student_id', studentId).maybeSingle();
+  },
+
+  // ---- 관리자용 (앱 소유자 전용, RLS가 role='admin'인 계정만 허용) ----
+  async adminAllProfessors() {
+    return sb.from('professors').select('*').order('created_at', { ascending: false });
+  },
+  async adminAllGroups() {
+    return sb.from('groups').select('*, professors(name, email)').order('created_at', { ascending: false });
+  },
+  async adminAllStudents() {
+    return sb.from('students').select('*').order('created_at', { ascending: false });
+  },
+  async adminAllExamsWithAttemptCount() {
+    return sb.from('exams').select('*, groups(name), attempts(count)').order('created_at', { ascending: false });
   }
 };

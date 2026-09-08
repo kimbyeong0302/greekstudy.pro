@@ -116,34 +116,44 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   const email = document.getElementById('inEmail').value.trim();
   const password = document.getElementById('inPassword').value;
 
-  try {
-    if (mode === 'signup') {
+  if (mode === 'signup') {
+    // 회원가입 결과는 반드시 팝업(alert)으로 확인시켜 드립니다.
+    try {
       if (role === 'professor') {
         if (!email || !password || !name) throw new Error('모든 항목을 입력해주세요.');
         const { error } = await Auth.signUpProfessor(email, password, name);
-        if (error) throw error;
+        if (error) {
+          if ((error.message || '').toLowerCase().includes('already')) throw new Error('이미 가입된 이메일입니다.');
+          throw error;
+        }
+        alert('회원가입이 되었습니다.\n이메일로 전송된 인증 링크를 클릭한 뒤 로그인해주세요.');
       } else {
         if (!studentNumber || !password || !name) throw new Error('모든 항목을 입력해주세요.');
         const { error } = await Auth.signUpStudent(studentNumber, name, password);
         if (error) throw error;
+        alert('회원가입이 되었습니다.');
       }
-      msgEl.textContent = '회원가입 완료! 로그인해주세요.';
-      msgEl.style.display = 'block';
       mode = 'login';
       modeRow.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'login'));
       render();
-    } else {
+    } catch (err) {
+      alert(err.message || '회원가입에 실패했습니다.');
+    }
+  } else {
+    try {
       const { error } = role === 'professor'
         ? await Auth.signInProfessor(email, password)
         : await Auth.signInStudent(studentNumber, password);
       if (error) throw error;
       const session = await Auth.getSession();
       const userRole = await Auth.getRole(session.user.id);
-      window.location.href = userRole === 'professor' ? 'professor.html' : 'student.html';
+      if (userRole === 'admin') window.location.href = 'admin.html';
+      else if (userRole === 'professor') window.location.href = 'professor.html';
+      else window.location.href = 'student.html';
+    } catch (err) {
+      errEl.textContent = err.message || '오류가 발생했습니다.';
+      errEl.style.display = 'block';
     }
-  } catch (err) {
-    errEl.textContent = err.message || '오류가 발생했습니다.';
-    errEl.style.display = 'block';
   }
 });
 
