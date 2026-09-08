@@ -15,8 +15,11 @@ function studentEmail(studentNumber) {
 
 // 학생은 실제 이메일이 없어서(가짜 이메일) 인증 메일을 받을 방법이 없으므로,
 // 학생 계정만 Edge Function(signup)으로 즉시 활성화 상태로 만듭니다.
-async function callSignupFunction(payload) {
-  const res = await fetch(SUPABASE_URL + '/functions/v1/signup', {
+// 교수도 인증 메일 발송을 Supabase 기본 SMTP가 아니라 이 방식(Edge Function → Resend
+// 직접 호출)으로 처리합니다. Supabase Auth의 자체 메일 발송 설정에 문제가 있어도
+// 영향받지 않도록, 인증 "링크"만 관리자 API로 만들고 실제 발송은 우리가 직접 합니다.
+async function callEdgeFunction(name, payload) {
+  const res = await fetch(SUPABASE_URL + '/functions/v1/' + name, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -26,22 +29,25 @@ async function callSignupFunction(payload) {
     body: JSON.stringify(payload)
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(json.error || '회원가입에 실패했습니다.');
+  if (!res.ok) throw new Error(json.error || '요청에 실패했습니다.');
   return json;
 }
 
 const Auth = {
-  // 교수는 실제 이메일을 쓰므로, 토블 앱과 동일하게 Supabase의 기본 이메일 인증
-  // 절차(가입 → 인증 메일의 링크 클릭 → 로그인)를 그대로 사용합니다.
+  // 교수: 실제 이메일을 쓰므로 이메일 인증이 반드시 필요합니다. 다만 Supabase
+  // 프로젝트의 기본 SMTP 설정에 의존하지 않고, professor-signup Edge Function이
+  // 인증 링크를 만들고 Resend API로 직접 이메일을 발송합니다.
   async signUpProfessor(email, password, name) {
-    return sb.auth.signUp({
-      email, password,
-      options: { data: { role: 'professor', name } }
-    });
+    try {
+      await callEdgeFunction('professor-signup', { email, password, name });
+      return { error: null };
+    } catch (err) {
+      return { error: err };
+    }
   },
   async signUpStudent(studentNumber, name, password) {
     try {
-      await callSignupFunction({ role: 'student', studentNumber, name, password });
+      await callEdgeFunction('signup', { role: 'student', studentNumber, name, password });
       return { error: null };
     } catch (err) {
       return { error: err };

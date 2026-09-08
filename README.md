@@ -13,24 +13,26 @@
 - `supabase/seed_words.sql` — 1주차 단어 시드 데이터
 - `supabase/functions/send-report/index.ts` — 결과 엑셀을 만들어 Resend로 이메일 전송하는 Edge Function
 - `supabase/functions/signup/index.ts` — 학생 전용 가입 Edge Function (실제 이메일이 없는 계정이라 관리자 권한으로 바로 인증된 상태로 생성)
+- `supabase/functions/professor-signup/index.ts` — 교수 가입 + 이메일 인증 Edge Function (Supabase 기본 SMTP 대신 Resend로 직접 인증 메일 발송)
 - `admin.html` — 관리자(앱 소유자) 전용 대시보드: 전체 교수/그룹/학생/시험 현황을 읦기 전용으로 조회
 - `supabase/migration_002_admin_role.sql` — 관리자 권한 추가 마이그레이션 (001 스키마 적용 후 이어서 실행)
 
 ## 배포 전 체크리스트
 
-1. **DB 마이그레이션 적용**: `greek_quiz_schema.sql` → `migration_002_admin_role.sql` → `seed_words.sql` 순서로 Supabase 프로젝트(`tepsuxyfyrkylyhsngwo`)에 적용
-2. **Edge Function 배포**: `supabase functions deploy send-report`, `supabase functions deploy signup`
+1. **DB 마이그레이션 적용**: `greek_quiz_schema.sql` → `migration_002_admin_role.sql` → `migration_003_expose_schema.sql` → `migration_004_fix_rls_recursion.sql` → `seed_words.sql` 순서로 Supabase 프로젝트(`tepsuxyfyrkylyhsngwo`)에 적용
+2. **Edge Function 배포**: `supabase functions deploy send-report`, `supabase functions deploy signup`, `supabase functions deploy professor-signup`
 3. **Resend 시크릿 등록**: `supabase secrets set RESEND_API_KEY=발급받은키`
    - 자체 도메인을 아직 Resend에 인증하지 않았다면, 발신 주소는 기본값(`onboarding@resend.dev`)으로 테스트 가능
    - 도메인 인증 후에는 `supabase secrets set REPORT_FROM_ADDRESS=noreply@내도메인.kr`
-4. **GitHub Pages 배포**: 이 폴더를 새 저장소(`greekquiz-pro`)에 올리고 GitHub Pages 활성화
+4. **Redirect URL 등록**: Supabase 대시보드 → Authentication → URL Configuration → Redirect URLs에 배포된 사이트 주소(예: `https://kimbyeong0302.github.io/greekstudy.pro/*`)를 추가. 이게 없으면 인증 링크 생성 자체가 막힐 수 있습니다.
+5. **GitHub Pages 배포**: 이 폴더를 새 저장소(`greekquiz-pro`)에 올리고 GitHub Pages 활성화
 
 ## 회원가입 방식이 교수/학생마다 다른 이유
 
-- **교수**: 실제 이메일을 쓰므로 토블 앱과 동일하게 Supabase 기본 이메일 인증 절차(가입 → 인증 메일의 링크 클릭 → 로그인)를 그대로 따릅니다. 프로젝트에 이미 연결된 Resend SMTP를 그대로 재사용하므로 추가 설정이 필요 없습니다.
+- **교수**: 실제 이메일을 쓰므로 이메일 인증이 반드시 필요합니다. 다만 Supabase 프로젝트의 기본 SMTP 발송에 문제가 있어 인증 메일이 전혀 오지 않는 문제가 있었기 때문에, Supabase의 메일 발송 기능 자체는 쓰지 않습니다. 대신 `professor-signup` Edge Function이 Supabase 관리자 API로 "인증 링크"만 생성하고, 그 메일은 `send-report`와 동일한 방식으로 Resend API를 직접 호출해서 우리가 보냅니다. 인증 링크를 클릭하면 Supabase가 계정을 인증 완료 처리합니다.
 - **학생**: 학번 기반의 가짜 이메일(`s학번@students.greekquiz.local`)을 쓰기 때문에 인증 메일을 받아 클릭할 방법이 없습니다. 그래서 학생만 `signup` Edge Function을 통해 관리자 권한으로 이미 인증된 상태의 계정을 만들어 가입 즉시 로그인할 수 있게 합니다.
 
-Supabase의 "이메일 인증 필수" 설정은 프로젝트 전체(토블 앱과 공유)에 적용되는 값이라 그대로 켜져 있어도 문제 없습니다 — 학생 계정은 그 설정과 무관하게 관리자 API로 직접 인증 처리되기 때문입니다.
+두 방식 모두 Supabase Auth의 "이메일 인증 필수" 프로젝트 설정과는 무관하게 동작합니다(교수는 우리가 직접 발송, 학생은 관리자 API로 즉시 인증 처리) — 그래서 토블 앱의 자체 이메일 인증 설정을 건드리거나 공유할 필요가 없습니다.
 
 ## 관리자(앱 소유자) 계정
 
