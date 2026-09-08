@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>단어 시험</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; background:#f4f1ea; color:#222; min-height:100vh; }
+.screen { max-width: 480px; margin: 0 auto; padding: 24px 16px 72px; }
+h1 { font-size: 20px; text-align:center; margin:0 0 20px; font-weight:700; }
+.status { display:flex; justify-content:space-between; align-items:center; font-size:14px; color:#555; margin-bottom:12px; }
+#scoreEl { font-weight:600; color:#222; }
+#timerEl { font-size:20px; font-weight:800; color:#2e6ed6; width:36px; height:36px; border-radius:50%; border:2.5px solid #2e6ed6; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+#timerEl.urgent { color:#d64545; border-color:#d64545; }
+#timerEl:empty { border-color:transparent; }
+.word-card { background:#fff; border-radius:16px; padding:28px 16px 24px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.08); margin-bottom:18px; min-height:130px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+#wordDisplay { font-weight:700; font-size:32px; word-break:break-word; }
+#subDisplay { font-size:16px; color:#777; margin-top:6px; }
+#subDisplay:empty { display:none; }
+#hintText { font-size:13px; color:#999; margin-top:10px; }
+.choices { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.choices button { padding:13px 8px; font-size:14px; border-radius:10px; border:1.5px solid #ddd; background:#fff; cursor:pointer; }
+.choices button.correct { border-color:#2e9e4f; background:#e6f6ea; }
+.choices button.wrong { border-color:#d64545; background:#fdecec; }
+#feedbackEl { min-height:20px; text-align:center; font-size:14px; margin-top:14px; }
+.correct-text { color:#2e9e4f; } .wrong-text { color:#d64545; }
+.final { text-align:center; font-size:15px; font-weight:700; margin-top:10px; }
+.btn-row { display:flex; justify-content:center; gap:8px; margin-top:18px; }
+.btn-row button { padding:10px 16px; font-size:13px; border-radius:10px; border:1.5px solid #ccc; background:#fff; cursor:pointer; }
+#wrongList { display:none; margin-top:24px; }
+.wl-title { font-size:15px; font-weight:700; margin:0 0 12px; color:#333; }
+.wi { background:#fff; border-radius:12px; border:1.5px solid #f0c0c0; padding:14px 16px; margin-bottom:10px; }
+.wi-q { font-size:17px; font-weight:700; margin-bottom:8px; }
+.wi-row { display:flex; gap:8px; font-size:13px; margin-top:4px; }
+.wi-lbl { color:#aaa; } .wi-wrong { color:#d64545; font-weight:600; } .wi-correct { color:#2e9e4f; font-weight:600; }
+.all-correct { text-align:center; font-size:15px; color:#2e9e4f; font-weight:700; background:#e6f6ea; border-radius:14px; padding:20px; }
+.notice { text-align:center; color:#666; font-size:14px; padding:40px 20px; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <h1>단어 시험</h1>
+  <div id="noticeEl" class="notice">불러오는 중...</div>
+
+  <div id="quizWrap" style="display:none">
+    <div class="status">
+      <span id="progressEl"></span>
+      <span id="timerEl"></span>
+      <span id="scoreEl"></span>
+    </div>
+    <div class="word-card">
+      <div id="wordDisplay"></div>
+      <div id="subDisplay"></div>
+      <div id="hintText"></div>
+    </div>
+    <div class="choices" id="choicesEl"></div>
+    <div id="feedbackEl"></div>
+    <div class="btn-row"><button id="backBtn">← 학생 홈으로</button></div>
+    <div id="wrongList"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script>
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+let me = null, exam = null, words = [];
+let quizOrder = [], qIdx = 0, score = 0, answered = false, wrongAnswers = [];
+let countdownTimer = null, moveTimer = null;
+
+const noticeEl = document.getElementById('noticeEl');
+const quizWrap = document.getElementById('quizWrap');
+const progressEl = document.getElementById('progressEl');
+const timerEl = document.getElementById('timerEl');
+const scoreEl = document.getElementById('scoreEl');
+const wordDisplay = document.getElementById('wordDisplay');
+const subDisplay = document.getElementById('subDisplay');
+const hintText = document.getElementById('hintText');
+const choicesEl = document.getElementById('choicesEl');
+const feedbackEl = document.getElementById('feedbackEl');
+const wrongListEl = document.getElementById('wrongList');
+
+async function init() {
+  const session = await Auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+  const role = await Auth.getRole(session.user.id);
+  if (role !== 'student') { window.location.href = 'index.html'; return; }
+  me = session.user;
+
+  const examId = new URLSearchParams(window.location.search).get('exam');
+  if (!examId) { noticeEl.textContent = '잘못된 접근입니다.'; return; }
+
+  const { data: existing } = await Api.myAttempt(examId, me.id);
+  if (existing) { noticeEl.textContent = `이미 응시한 시험입니다. (${existing.score} / ${existing.total}점)`; return; }
+
+  const { data: examData, error: examErr } = await sb.from('exams').select('*').eq('id', examId).maybeSingle();
+  if (examErr || !examData) { noticeEl.textContent = '응시할 수 없는 시험입니다.'; return; }
+  exam = examData;
+
+  const { data: wordData } = await Api.wordsForWeeks(exam.weeks);
+  words = wordData || [];
+  if (words.length === 0) { noticeEl.textContent = '이 시험에 해당하는 단어가 없습니다.'; return; }
+
+  noticeEl.style.display = 'none';
+  quizWrap.style.display = 'block';
+  launchQuiz();
+}
+
+function launchQuiz() {
+  quizOrder = shuffle(words.map(w => ({ data: w })));
+  qIdx = 0; score = 0; answered = false; wrongAnswers = [];
+  renderQuestion();
+}
+
+function stopTimers() {
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  if (moveTimer) { clearTimeout(moveTimer); moveTimer = null; }
+  timerEl.textContent = ''; timerEl.classList.remove('urgent');
+}
+
+function renderQuestion() {
+  stopTimers(); answered = false; feedbackEl.innerHTML = '';
+  wrongListEl.style.display = 'none'; wrongListEl.innerHTML = '';
+  const q = quizOrder[qIdx];
+  progressEl.textContent = '문제 ' + (qIdx + 1) + ' / ' + quizOrder.length;
+  scoreEl.textContent = '맞은 개수: ' + score;
+  const w = q.data, lv = exam.level;
+  if (lv === 3) {
+    wordDisplay.style.fontSize = '22px';
+    wordDisplay.textContent = w.ko || w.en;
+    subDisplay.textContent = '';
+    hintText.textContent = '이 뜻에 해당하는 헬라어 단어는?';
+  } else {
+    wordDisplay.style.fontSize = '32px';
+    wordDisplay.textContent = w.gr;
+    subDisplay.textContent = (lv === 1 && w.kr) ? '[' + w.kr + ']' : '';
+    hintText.textContent = '이 단어의 뜻은?';
+  }
+  const matchKey = lv === 3 ? 'gr' : 'en';
+  const pool = shuffle(words.filter(x => x[matchKey] !== w[matchKey])).slice(0, 3);
+  pool.push(w);
+  buildChoices(shuffle(pool), opt => opt[matchKey], w[matchKey], q);
+}
+
+function buildChoices(opts, getValue, correctVal, q) {
+  choicesEl.innerHTML = '';
+  opts.forEach(opt => {
+    const val = getValue(opt);
+    const btn = document.createElement('button');
+    btn.textContent = val;
+    btn.addEventListener('click', () => {
+      if (answered) return;
+      answered = true;
+      if (exam.mode === 'test') { stopTimers(); }
+      if (val === correctVal) {
+        score++; btn.classList.add('correct');
+        feedbackEl.innerHTML = '<span class="correct-text">정답입니다.</span>';
+      } else {
+        btn.classList.add('wrong');
+        wrongAnswers.push({ q, chosen: val, correct: correctVal });
+        feedbackEl.innerHTML = '<span class="wrong-text">오답입니다. 정답: ' + correctVal + '</span>';
+      }
+      scoreEl.textContent = '맞은 개수: ' + score;
+      Array.from(choicesEl.children).forEach(c => { if (c.textContent === correctVal && c !== btn) c.classList.add('correct'); });
+      scheduleNext();
+    });
+    choicesEl.appendChild(btn);
+  });
+  if (exam.mode === 'test') startQuestionTimer(correctVal, q);
+}
+
+function startQuestionTimer(correctVal, q) {
+  let count = exam.time_limit_sec || 3;
+  timerEl.textContent = count; timerEl.classList.remove('urgent');
+  countdownTimer = setInterval(() => {
+    count--;
+    if (count > 0) {
+      timerEl.textContent = count;
+      if (count === 1) timerEl.classList.add('urgent');
+    } else {
+      clearInterval(countdownTimer); countdownTimer = null;
+      if (answered) return;
+      answered = true;
+      wrongAnswers.push({ q, chosen: '(시간 초과)', correct: correctVal });
+      Array.from(choicesEl.children).forEach(c => { if (c.textContent === correctVal) c.classList.add('correct'); });
+      feedbackEl.innerHTML = '<span class="wrong-text">시간 초과! 정답: ' + correctVal + '</span>';
+      timerEl.textContent = ''; timerEl.classList.remove('urgent');
+      scheduleNext();
+    }
+  }, 1000);
+}
+
+function scheduleNext() {
+  moveTimer = setTimeout(() => { moveTimer = null; advanceOrEnd(); }, 1000);
+}
+
+async function advanceOrEnd() {
+  if (qIdx < quizOrder.length - 1) { qIdx++; renderQuestion(); return; }
+  feedbackEl.innerHTML += '<div class="final">시험 종료! 최종 점수: ' + score + ' / ' + quizOrder.length + '</div>';
+  showWrongList();
+  await Api.submitAttempt(exam.id, me.id, score, quizOrder.length, wrongAnswers.map(w => ({
+    word: w.q.data.gr, chosen: w.chosen, correct: w.correct
+  })));
+}
+
+function showWrongList() {
+  wrongListEl.style.display = 'block';
+  let html = '';
+  if (wrongAnswers.length === 0) {
+    html = '<p class="all-correct">모두 맞혔습니다! 🎉</p>';
+  } else {
+    html = '<p class="wl-title">틀린 문제 목록 (' + wrongAnswers.length + '개)</p>';
+    wrongAnswers.forEach(({ q, chosen, correct }) => {
+      const w = q.data, lv = exam.level;
+      const qText = lv === 3 ? (w.ko || w.en) : (w.gr + (w.kr ? ' [' + w.kr + ']' : ''));
+      html += '<div class="wi"><div class="wi-q">' + qText + '</div>' +
+        '<div class="wi-row"><span class="wi-lbl">내 답 </span><span class="wi-wrong">' + chosen + '</span></div>' +
+        '<div class="wi-row"><span class="wi-lbl">정답 </span><span class="wi-correct">' + correct + '</span></div></div>';
+    });
+  }
+  wrongListEl.innerHTML = html;
+}
+
+document.getElementById('backBtn').addEventListener('click', () => { window.location.href = 'student.html'; });
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>학생 홈</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; background:#f4f1ea; color:#222; }
+.screen { max-width: 480px; margin: 0 auto; padding: 24px 16px 72px; }
+.top { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+h1 { font-size: 20px; margin:0; font-weight:700; }
+#logoutBtn { font-size:12px; color:#888; background:none; border:1px solid #ddd; border-radius:8px; padding:6px 10px; cursor:pointer; }
+.card { background:#fff; border-radius:16px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
+.card-title { font-size:11px; font-weight:700; color:#aaa; letter-spacing:0.8px; text-transform:uppercase; margin:0 0 12px; }
+.join-row { display:flex; gap:8px; }
+.join-row input { flex:1; padding:11px 12px; font-size:15px; border-radius:10px; border:1.5px solid #ddd; }
+.join-row button { padding:11px 16px; font-size:14px; font-weight:700; border-radius:10px; border:none; background:#2e6ed6; color:#fff; cursor:pointer; }
+.group-chip { display:inline-block; padding:6px 12px; border-radius:20px; background:#f0ede6; font-size:13px; margin:0 6px 6px 0; }
+.exam-item { border:1.5px solid #eee; border-radius:12px; padding:14px 16px; margin-bottom:10px; }
+.exam-item .g-name { font-size:12px; color:#2e6ed6; font-weight:700; margin-bottom:4px; }
+.exam-item .desc { font-size:13px; color:#666; margin-bottom:10px; }
+.exam-item button { width:100%; padding:10px; font-size:14px; font-weight:700; border-radius:10px; border:none; background:#2e6ed6; color:#fff; cursor:pointer; }
+.exam-item button.done { background:#e6f6ea; color:#2e9e4f; cursor:default; }
+.empty { color:#999; font-size:13px; text-align:center; padding:12px 0; }
+.err { color:#d64545; font-size:13px; margin-top:8px; display:none; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="top">
+    <h1>학생 홈</h1>
+    <button id="logoutBtn">로그아웃</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">그룹 코드로 가입</div>
+    <div class="join-row">
+      <input type="text" id="codeInput" placeholder="예: AB12CD">
+      <button id="joinBtn">가입</button>
+    </div>
+    <div class="err" id="joinErr"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">내 그룹</div>
+    <div id="groupList" class="empty">불러오는 중...</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">응시 가능한 시험</div>
+    <div id="examList" class="empty">불러오는 중...</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script>
+let me = null;
+
+async function init() {
+  const session = await Auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+  const role = await Auth.getRole(session.user.id);
+  if (role !== 'student') { window.location.href = 'index.html'; return; }
+  me = session.user;
+  await loadGroups();
+  await loadExams();
+}
+
+async function loadGroups() {
+  const { data } = await Api.myGroupsAsStudent(me.id);
+  const el = document.getElementById('groupList');
+  if (!data || data.length === 0) { el.textContent = '아직 가입한 그룹이 없습니다.'; return; }
+  el.innerHTML = data.map(m => `<span class="group-chip">${m.groups.name}</span>`).join('');
+}
+
+async function loadExams() {
+  const { data } = await Api.activeExamsForStudent(me.id);
+  const el = document.getElementById('examList');
+  if (!data || data.length === 0) { el.textContent = '지금 응시 가능한 시험이 없습니다.'; return; }
+  el.innerHTML = '';
+  for (const exam of data) {
+    const { data: attempt } = await Api.myAttempt(exam.id, me.id);
+    const modeLabel = exam.mode === 'test' ? `테스트 모드 (${exam.time_limit_sec}초)` : '연습 모드';
+    const div = document.createElement('div');
+    div.className = 'exam-item';
+    div.innerHTML = `
+      <div class="g-name">${exam.groups ? exam.groups.name : ''}</div>
+      <div class="desc">${exam.weeks.join(', ')}주차 단어 · ${exam.level}단계 · ${modeLabel}</div>
+      ${attempt
+        ? `<button class="done" disabled>응시 완료 (${attempt.score} / ${attempt.total}점)</button>`
+        : `<button data-exam="${exam.id}">응시하기</button>`}
+    `;
+    el.appendChild(div);
+  }
+  el.querySelectorAll('button[data-exam]').forEach(b => {
+    b.addEventListener('click', () => { window.location.href = 'quiz.html?exam=' + b.dataset.exam; });
+  });
+}
+
+document.getElementById('joinBtn').addEventListener('click', async () => {
+  const code = document.getElementById('codeInput').value.trim().toUpperCase();
+  const errEl = document.getElementById('joinErr');
+  errEl.style.display = 'none';
+  if (!code) return;
+  const { error } = await Api.joinGroupByCode(code);
+  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return; }
+  document.getElementById('codeInput').value = '';
+  await loadGroups();
+  await loadExams();
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await Auth.signOut();
+  window.location.href = 'index.html';
+});
+
+init();
+</script>
+</body>
+</html>

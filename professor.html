@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>교수 대시보드</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; background:#f4f1ea; color:#222; }
+.screen { max-width: 560px; margin: 0 auto; padding: 24px 16px 72px; }
+.top { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+h1 { font-size: 20px; margin:0; font-weight:700; }
+#logoutBtn { font-size:12px; color:#888; background:none; border:1px solid #ddd; border-radius:8px; padding:6px 10px; cursor:pointer; }
+.card { background:#fff; border-radius:16px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
+.card-title { font-size:11px; font-weight:700; color:#aaa; letter-spacing:0.8px; text-transform:uppercase; margin:0 0 12px; }
+.row { display:flex; gap:8px; }
+.row input { flex:1; padding:11px 12px; font-size:15px; border-radius:10px; border:1.5px solid #ddd; }
+.row button, .wide-btn { padding:11px 16px; font-size:14px; font-weight:700; border-radius:10px; border:none; background:#2e6ed6; color:#fff; cursor:pointer; }
+.wide-btn { width:100%; margin-top:10px; }
+.group-item { border:1.5px solid #eee; border-radius:12px; padding:12px 14px; margin-bottom:8px; cursor:pointer; }
+.group-item.active { border-color:#2e6ed6; background:#eaf1fd; }
+.group-item .code { font-size:12px; color:#2e6ed6; font-weight:700; }
+.chk-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+.chk-row label { font-size:13px; background:#f0ede6; padding:6px 10px; border-radius:8px; cursor:pointer; }
+.lv-row, .mode-row-p { display:flex; gap:6px; margin-bottom:10px; }
+.lv-row button, .mode-row-p button { flex:1; padding:8px 4px; font-size:12px; border-radius:8px; border:1.5px solid #ddd; background:#fff; cursor:pointer; }
+.lv-row button.active, .mode-row-p button.active { border-color:#2e6ed6; background:#eaf1fd; color:#2e6ed6; font-weight:700; }
+.exam-row { border:1.5px solid #eee; border-radius:12px; padding:12px 14px; margin-bottom:8px; }
+.exam-row .desc { font-size:13px; margin-bottom:8px; }
+.exam-row .btns { display:flex; gap:6px; flex-wrap:wrap; }
+.exam-row .btns button { font-size:12px; padding:7px 10px; border-radius:8px; border:1.5px solid #ddd; background:#fff; cursor:pointer; }
+table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+th, td { text-align:left; padding:6px 4px; border-bottom:1px solid #eee; }
+.empty { color:#999; font-size:13px; text-align:center; padding:12px 0; }
+.msg { font-size:12px; margin-top:6px; }
+.msg.ok { color:#2e9e4f; } .msg.err { color:#d64545; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="top">
+    <h1>교수 대시보드</h1>
+    <button id="logoutBtn">로그아웃</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">새 그룹(과목) 만들기</div>
+    <div class="row">
+      <input type="text" id="groupNameInput" placeholder="예: 헬라어 1 (2026-2)">
+      <button id="createGroupBtn">생성</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">내 그룹</div>
+    <div id="groupList" class="empty">불러오는 중...</div>
+  </div>
+
+  <div class="card" id="examSetupCard" style="display:none">
+    <div class="card-title">선택한 그룹에 시험 세팅</div>
+    <div id="weekChks" class="chk-row"></div>
+    <div class="lv-row" id="lvRowP">
+      <button class="active" data-lv="1">1단계</button>
+      <button data-lv="2">2단계</button>
+      <button data-lv="3">3단계</button>
+    </div>
+    <div class="mode-row-p" id="modeRowP">
+      <button data-mode="practice">연습</button>
+      <button class="active" data-mode="test">테스트(3초)</button>
+    </div>
+    <button class="wide-btn" id="createExamBtn">시험 생성 및 활성화</button>
+    <div class="msg" id="examMsg"></div>
+  </div>
+
+  <div class="card" id="examListCard" style="display:none">
+    <div class="card-title">시험 목록 및 결과</div>
+    <div id="examList" class="empty">그룹을 선택하세요.</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script>
+let me = null;
+let groups = [];
+let selectedGroupId = null;
+let selectedLevel = 1;
+let selectedMode = 'test';
+
+async function init() {
+  const session = await Auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+  const role = await Auth.getRole(session.user.id);
+  if (role !== 'professor') { window.location.href = 'index.html'; return; }
+  me = session.user;
+  await loadGroups();
+  await loadWeekOptions();
+}
+
+async function loadWeekOptions() {
+  const { data } = await sb.from('words').select('week');
+  const weeks = [...new Set((data || []).map(w => w.week))].sort((a, b) => a - b);
+  const el = document.getElementById('weekChks');
+  el.innerHTML = weeks.map(w => `<label><input type="checkbox" value="${w}" checked> ${w}주차</label>`).join('');
+}
+
+async function loadGroups() {
+  const { data } = await Api.myGroups(me.id);
+  groups = data || [];
+  const el = document.getElementById('groupList');
+  if (groups.length === 0) { el.textContent = '아직 만든 그룹이 없습니다.'; return; }
+  el.innerHTML = '';
+  groups.forEach(g => {
+    const div = document.createElement('div');
+    div.className = 'group-item' + (g.id === selectedGroupId ? ' active' : '');
+    div.innerHTML = `<div>${g.name}</div><div class="code">가입 코드: ${g.join_code}</div>`;
+    div.addEventListener('click', () => selectGroup(g.id));
+    el.appendChild(div);
+  });
+}
+
+function selectGroup(groupId) {
+  selectedGroupId = groupId;
+  document.getElementById('examSetupCard').style.display = 'block';
+  document.getElementById('examListCard').style.display = 'block';
+  loadGroups();
+  loadExams();
+}
+
+document.getElementById('createGroupBtn').addEventListener('click', async () => {
+  const name = document.getElementById('groupNameInput').value.trim();
+  if (!name) return;
+  const { error } = await Api.createGroup(me.id, name);
+  if (error) { alert(error.message); return; }
+  document.getElementById('groupNameInput').value = '';
+  await loadGroups();
+});
+
+document.getElementById('lvRowP').addEventListener('click', e => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  document.querySelectorAll('#lvRowP button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active'); selectedLevel = parseInt(btn.dataset.lv);
+});
+document.getElementById('modeRowP').addEventListener('click', e => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  document.querySelectorAll('#modeRowP button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active'); selectedMode = btn.dataset.mode;
+});
+
+document.getElementById('createExamBtn').addEventListener('click', async () => {
+  const weeks = [...document.querySelectorAll('#weekChks input:checked')].map(c => parseInt(c.value));
+  const msgEl = document.getElementById('examMsg');
+  msgEl.className = 'msg';
+  if (weeks.length === 0) { msgEl.textContent = '주차를 하나 이상 선택하세요.'; msgEl.classList.add('err'); return; }
+  const { error } = await Api.createExam(selectedGroupId, {
+    weeks, level: selectedLevel, mode: selectedMode,
+    timeLimitSec: selectedMode === 'test' ? 3 : 0
+  });
+  if (error) { msgEl.textContent = error.message; msgEl.classList.add('err'); return; }
+  msgEl.textContent = '시험이 생성되어 학생들에게 활성화되었습니다.';
+  msgEl.classList.add('ok');
+  await loadExams();
+});
+
+async function loadExams() {
+  const { data } = await Api.examsForGroup(selectedGroupId);
+  const el = document.getElementById('examList');
+  if (!data || data.length === 0) { el.textContent = '아직 생성된 시험이 없습니다.'; return; }
+  el.innerHTML = '';
+  data.forEach(exam => {
+    const div = document.createElement('div');
+    div.className = 'exam-row';
+    div.innerHTML = `
+      <div class="desc">${exam.weeks.join(', ')}주차 · ${exam.level}단계 · ${exam.mode === 'test' ? '테스트' : '연습'} · ${exam.active ? '활성' : '비활성'}</div>
+      <div class="btns">
+        <button data-act="toggle" data-id="${exam.id}" data-active="${exam.active}">${exam.active ? '비활성화' : '활성화'}</button>
+        <button data-act="results" data-id="${exam.id}">결과 보기</button>
+        <button data-act="email" data-id="${exam.id}">엑셀로 이메일 받기</button>
+      </div>
+      <div class="results-box" id="results-${exam.id}"></div>
+      <div class="msg" id="email-msg-${exam.id}"></div>
+    `;
+    el.appendChild(div);
+  });
+
+  el.querySelectorAll('button[data-act="toggle"]').forEach(b => {
+    b.addEventListener('click', async () => {
+      await Api.setExamActive(b.dataset.id, b.dataset.active !== 'true');
+      await loadExams();
+    });
+  });
+  el.querySelectorAll('button[data-act="results"]').forEach(b => {
+    b.addEventListener('click', () => showResults(b.dataset.id));
+  });
+  el.querySelectorAll('button[data-act="email"]').forEach(b => {
+    b.addEventListener('click', () => sendEmailReport(b.dataset.id));
+  });
+}
+
+async function showResults(examId) {
+  const { data } = await Api.attemptsForExam(examId);
+  const box = document.getElementById('results-' + examId);
+  if (!data || data.length === 0) { box.innerHTML = '<div class="empty">아직 응시 기록이 없습니다.</div>'; return; }
+  box.innerHTML = `<table><tr><th>학번</th><th>이름</th><th>점수</th></tr>` +
+    data.map(a => `<tr><td>${a.students.student_number}</td><td>${a.students.name}</td><td>${a.score} / ${a.total}</td></tr>`).join('') +
+    `</table>`;
+}
+
+async function sendEmailReport(examId) {
+  const msgEl = document.getElementById('email-msg-' + examId);
+  msgEl.className = 'msg'; msgEl.textContent = '전송 중...';
+  try {
+    const session = await Auth.getSession();
+    const res = await fetch(SUPABASE_URL + '/functions/v1/send-report', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + session.access_token
+      },
+      body: JSON.stringify({ examId })
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || '전송 실패');
+    msgEl.classList.add('ok');
+    msgEl.textContent = '이메일로 전송되었습니다.';
+  } catch (err) {
+    msgEl.classList.add('err');
+    msgEl.textContent = err.message;
+  }
+}
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await Auth.signOut();
+  window.location.href = 'index.html';
+});
+
+init();
+</script>
+</body>
+</html>

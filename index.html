@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>헬라어 단어 시험</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0; font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  background: #f4f1ea; color: #222; min-height: 100vh;
+}
+.screen { max-width: 420px; margin: 0 auto; padding: 40px 16px 72px; }
+h1 { font-size: 22px; text-align: center; margin: 0 0 24px; font-weight: 700; }
+.role-row, .mode-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.role-btn, .mode-btn {
+  flex: 1; padding: 10px 4px; font-size: 14px; font-weight: 600;
+  border-radius: 10px; border: 1.5px solid #ddd; background: #fff; color: #666; cursor: pointer;
+}
+.role-btn.active, .mode-btn.active { border-color: #2e6ed6; background: #eaf1fd; color: #2e6ed6; }
+.card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+.field { margin-bottom: 12px; }
+.field label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; font-weight: 600; }
+.field input {
+  width: 100%; padding: 11px 12px; font-size: 15px; border-radius: 10px;
+  border: 1.5px solid #ddd; box-sizing: border-box;
+}
+.submit-btn {
+  width: 100%; padding: 14px; font-size: 15px; font-weight: 700; border-radius: 12px;
+  border: none; background: #2e6ed6; color: #fff; cursor: pointer; margin-top: 6px;
+}
+.submit-btn:active { opacity: 0.85; }
+.err { color: #d64545; font-size: 13px; margin-top: 10px; text-align: center; display: none; }
+.msg { color: #2e9e4f; font-size: 13px; margin-top: 10px; text-align: center; display: none; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <h1>헬라어 단어 시험</h1>
+
+  <div class="role-row" id="roleRow">
+    <button class="role-btn active" data-role="student">학생</button>
+    <button class="role-btn" data-role="professor">교수</button>
+  </div>
+
+  <div class="mode-row" id="modeRow">
+    <button class="mode-btn active" data-mode="login">로그인</button>
+    <button class="mode-btn" data-mode="signup">회원가입</button>
+  </div>
+
+  <div class="card">
+    <form id="authForm">
+      <div class="field" id="fName" style="display:none">
+        <label>이름</label>
+        <input type="text" id="inName" autocomplete="name">
+      </div>
+      <div class="field" id="fStudentNumber" style="display:none">
+        <label>학번</label>
+        <input type="text" id="inStudentNumber" autocomplete="username">
+      </div>
+      <div class="field" id="fEmail">
+        <label>이메일</label>
+        <input type="email" id="inEmail" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>비밀번호</label>
+        <input type="password" id="inPassword" autocomplete="current-password">
+      </div>
+      <button type="submit" class="submit-btn" id="submitBtn">로그인</button>
+      <div class="err" id="errEl"></div>
+      <div class="msg" id="msgEl"></div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script>
+let role = 'student';
+let mode = 'login';
+
+const roleRow = document.getElementById('roleRow');
+const modeRow = document.getElementById('modeRow');
+const fName = document.getElementById('fName');
+const fStudentNumber = document.getElementById('fStudentNumber');
+const fEmail = document.getElementById('fEmail');
+const submitBtn = document.getElementById('submitBtn');
+const errEl = document.getElementById('errEl');
+const msgEl = document.getElementById('msgEl');
+
+function render() {
+  fName.style.display = mode === 'signup' ? 'block' : 'none';
+  fStudentNumber.style.display = (role === 'student') ? 'block' : 'none';
+  fEmail.style.display = (role === 'professor') ? 'block' : 'none';
+  submitBtn.textContent = mode === 'signup' ? '회원가입' : '로그인';
+  errEl.style.display = 'none';
+  msgEl.style.display = 'none';
+}
+
+roleRow.addEventListener('click', e => {
+  const btn = e.target.closest('.role-btn'); if (!btn) return;
+  roleRow.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active'); role = btn.dataset.role; render();
+});
+modeRow.addEventListener('click', e => {
+  const btn = e.target.closest('.mode-btn'); if (!btn) return;
+  modeRow.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active'); mode = btn.dataset.mode; render();
+});
+
+document.getElementById('authForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errEl.style.display = 'none'; msgEl.style.display = 'none';
+  const name = document.getElementById('inName').value.trim();
+  const studentNumber = document.getElementById('inStudentNumber').value.trim();
+  const email = document.getElementById('inEmail').value.trim();
+  const password = document.getElementById('inPassword').value;
+
+  try {
+    if (mode === 'signup') {
+      if (role === 'professor') {
+        if (!email || !password || !name) throw new Error('모든 항목을 입력해주세요.');
+        const { error } = await Auth.signUpProfessor(email, password, name);
+        if (error) throw error;
+      } else {
+        if (!studentNumber || !password || !name) throw new Error('모든 항목을 입력해주세요.');
+        const { error } = await Auth.signUpStudent(studentNumber, name, password);
+        if (error) throw error;
+      }
+      msgEl.textContent = '회원가입 완료! 로그인해주세요.';
+      msgEl.style.display = 'block';
+      mode = 'login';
+      modeRow.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'login'));
+      render();
+    } else {
+      const { error } = role === 'professor'
+        ? await Auth.signInProfessor(email, password)
+        : await Auth.signInStudent(studentNumber, password);
+      if (error) throw error;
+      const session = await Auth.getSession();
+      const userRole = await Auth.getRole(session.user.id);
+      window.location.href = userRole === 'professor' ? 'professor.html' : 'student.html';
+    }
+  } catch (err) {
+    errEl.textContent = err.message || '오류가 발생했습니다.';
+    errEl.style.display = 'block';
+  }
+});
+
+render();
+</script>
+</body>
+</html>
