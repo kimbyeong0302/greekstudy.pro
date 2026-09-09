@@ -225,9 +225,12 @@ async function advanceOrEnd() {
   showWrongList();
   if (exam.id) {
     // 시험 모드: 응시 기록을 저장합니다 (1회 제한).
-    await Api.submitAttempt(exam.id, me.id, score, quizOrder.length, wrongAnswers.map(w => ({
+    const { error: submitErr } = await Api.submitAttempt(exam.id, me.id, score, quizOrder.length, wrongAnswers.map(w => ({
       word: w.q.data.gr, chosen: w.chosen, correct: w.correct
     })));
+    if (submitErr) {
+      feedbackEl.innerHTML += `<div style="color:#d64545;font-size:13px;margin-top:8px;">⚠️ 결과 저장 실패: ${submitErr.message}</div>`;
+    }
   } else {
     // 자율 연습 모드: 기록을 남기지 않고, 원하면 바로 다시 연습할 수 있습니다.
     document.getElementById('retryBtn').style.display = 'inline-block';

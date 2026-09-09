@@ -70,8 +70,8 @@ const Auth = {
   async getRole(userId) {
     const { data: prof } = await sb.from('professors').select('id').eq('id', userId).maybeSingle();
     if (prof) return 'professor';
-    const { data: stu } = await sb.from('students').select('id, role').eq('id', userId).maybeSingle();
-    if (stu) return stu.role === 'admin' ? 'admin' : 'student';
+    const { data: stu } = await sb.from('students').select('id').eq('id', userId).maybeSingle();
+    if (stu) return 'student';
     return null;
   }
 };
