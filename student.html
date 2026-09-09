@@ -3,11 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <title>학생 홈</title>
-<script>(function(){var v='2026-09-09-1',s=localStorage.getItem('appVersion');if(s&&s!==v){localStorage.setItem('appVersion',v);location.reload(true);}else localStorage.setItem('appVersion',v);})();</script>
 <style>
 * { box-sizing: border-box; }
 body { margin:0; font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; background:#f4f1ea; color:#222; }
@@ -28,34 +24,13 @@ h1 { font-size: 20px; margin:0; font-weight:700; }
 .exam-item button.done { background:#e6f6ea; color:#2e9e4f; cursor:default; }
 .empty { color:#999; font-size:13px; text-align:center; padding:12px 0; }
 .err { color:#d64545; font-size:13px; margin-top:8px; display:none; }
-.top-right{display:flex;align-items:center;gap:8px;}
-.bell-btn{position:relative;background:none;border:none;cursor:pointer;padding:4px 6px;font-size:20px;line-height:1;}
-.bell-badge{position:absolute;top:-2px;right:-2px;background:#e53e3e;color:#fff;border-radius:999px;font-size:10px;font-weight:700;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;display:none;}
-.bell-badge.show{display:block;}
-.update-dropdown-wrap{position:relative;}
-.update-dropdown{position:absolute;top:calc(100% + 6px);right:0;width:270px;background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14px;z-index:100;display:none;}
-.update-dropdown.show{display:block;}
-.update-title{font-size:11px;font-weight:700;color:#aaa;letter-spacing:0.8px;text-transform:uppercase;margin:0 0 10px;}
-.update-item{padding:8px 0;border-bottom:1px solid #f0ede6;}
-.update-item:last-child{border-bottom:none;padding-bottom:0;}
-.u-date{font-size:11px;color:#aaa;margin-bottom:2px;}
-.u-text{font-size:13px;color:#333;line-height:1.5;}
 </style>
 </head>
 <body>
 <div class="screen">
   <div class="top">
     <h1>학생 홈</h1>
-    <div class="top-right">
-      <div class="update-dropdown-wrap">
-        <button class="bell-btn" id="bellBtn">🔔<span class="bell-badge" id="bellBadge"></span></button>
-        <div class="update-dropdown" id="updateDropdown">
-          <div class="update-title">업데이트 내역</div>
-          <div id="updateList"></div>
-        </div>
-      </div>
-      <button id="logoutBtn">로그아웃</button>
-    </div>
+    <button id="logoutBtn">로그아웃</button>
   </div>
 
   <div class="card">
@@ -86,30 +61,6 @@ h1 { font-size: 20px; margin:0; font-weight:700; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script>
-const APP_UPDATES = [
-  { date: '2026-09-09', text: '그룹 가입 코드가 숫자 4자리 방식으로 변경되었습니다.' },
-  { date: '2026-09-01', text: '교수 가입 시 이메일 인증 기능이 추가되었습니다.' },
-];
-(function(){
-  const lastSeen = localStorage.getItem('updateLastSeen') || '1970-01-01';
-  const unread = APP_UPDATES.filter(u => u.date > lastSeen);
-  const badge = document.getElementById('bellBadge');
-  const dropdown = document.getElementById('updateDropdown');
-  const bell = document.getElementById('bellBtn');
-  const list = document.getElementById('updateList');
-  if(unread.length > 0){ badge.textContent = unread.length > 9 ? '9+' : String(unread.length); badge.classList.add('show'); }
-  list.innerHTML = APP_UPDATES.map(u => `<div class="update-item"><div class="u-date">${u.date}</div><div class="u-text">${u.text}</div></div>`).join('');
-  bell.addEventListener('click', e => {
-    e.stopPropagation();
-    if(!dropdown.classList.contains('show')){
-      localStorage.setItem('updateLastSeen', new Date().toISOString().slice(0,10));
-      badge.classList.remove('show');
-    }
-    dropdown.classList.toggle('show');
-  });
-  document.addEventListener('click', () => dropdown.classList.remove('show'));
-})();
-
 let me = null;
 
 async function init() {

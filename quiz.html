@@ -3,9 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <title>단어 시험</title>
 <style>
 * { box-sizing: border-box; }
@@ -59,7 +56,10 @@ h1 { font-size: 20px; text-align:center; margin:0 0 20px; font-weight:700; }
     </div>
     <div class="choices" id="choicesEl"></div>
     <div id="feedbackEl"></div>
-    <div class="btn-row"><button id="backBtn">← 학생 홈으로</button></div>
+    <div class="btn-row">
+      <button id="backBtn">← 학생 홈으로</button>
+      <button id="retryBtn" style="display:none">다시 연습하기</button>
+    </div>
     <div id="wrongList"></div>
   </div>
 </div>
@@ -73,7 +73,7 @@ function shuffle(arr) {
   return a;
 }
 
-let me = null, exam = null, words = [];
+let me = null, exam = null, words = [], isPractice = false;
 let quizOrder = [], qIdx = 0, score = 0, answered = false, wrongAnswers = [];
 let countdownTimer = null, moveTimer = null;
 
@@ -96,19 +96,33 @@ async function init() {
   if (role !== 'student') { window.location.href = 'index.html'; return; }
   me = session.user;
 
-  const examId = new URLSearchParams(window.location.search).get('exam');
-  if (!examId) { noticeEl.textContent = '잘못된 접근입니다.'; return; }
+  const params = new URLSearchParams(window.location.search);
+  isPractice = params.get('practice') === '1';
 
-  const { data: existing } = await Api.myAttempt(examId, me.id);
-  if (existing) { noticeEl.textContent = `이미 응시한 시험입니다. (${existing.score} / ${existing.total}점)`; return; }
+  if (isPractice) {
+    // 자율 연습 모드: 특정 시험(exam)에 묶이지 않고, 학생이 직접 고른 주차/단계로
+    // 언제든 다시 연습할 수 있습니다. 점수는 저장되지 않고 응시 제한도 없습니다.
+    const weeks = (params.get('weeks') || '').split(',').map(n => parseInt(n)).filter(n => !isNaN(n));
+    const level = parseInt(params.get('level')) || 1;
+    if (weeks.length === 0) { noticeEl.textContent = '연습할 주차를 선택해주세요.'; return; }
+    exam = { id: null, weeks, level, mode: 'practice', time_limit_sec: 0 };
+    document.querySelector('h1').textContent = '단어 연습';
+  } else {
+    const examId = params.get('exam');
+    if (!examId) { noticeEl.textContent = '잘못된 접근입니다.'; return; }
 
-  const { data: examData, error: examErr } = await sb.from('exams').select('*').eq('id', examId).maybeSingle();
-  if (examErr || !examData) { noticeEl.textContent = '응시할 수 없는 시험입니다.'; return; }
-  exam = examData;
+    const { data: existing } = await Api.myAttempt(examId, me.id);
+    if (existing) { noticeEl.textContent = `이미 응시한 시험입니다. (${existing.score} / ${existing.total}점)`; return; }
 
+    const { data: examData, error: examErr } = await sb.from('exams').select('*').eq('id', examId).maybeSingle();
+    if (examErr || !examData) { noticeEl.textContent = '응시할 수 없는 시험입니다.'; return; }
+    exam = examData;
+  }
+
+  // words 테이블을 매번 새로 조회하므로, 이후 주차/단어를 추가하면 바로 반영됩니다.
   const { data: wordData } = await Api.wordsForWeeks(exam.weeks);
   words = wordData || [];
-  if (words.length === 0) { noticeEl.textContent = '이 시험에 해당하는 단어가 없습니다.'; return; }
+  if (words.length === 0) { noticeEl.textContent = '해당 주차에 등록된 단어가 없습니다.'; return; }
 
   noticeEl.style.display = 'none';
   quizWrap.style.display = 'block';
@@ -116,6 +130,7 @@ async function init() {
 }
 
 function launchQuiz() {
+  document.getElementById('retryBtn').style.display = 'none';
   quizOrder = shuffle(words.map(w => ({ data: w })));
   qIdx = 0; score = 0; answered = false; wrongAnswers = [];
   renderQuestion();
@@ -205,11 +220,18 @@ function scheduleNext() {
 
 async function advanceOrEnd() {
   if (qIdx < quizOrder.length - 1) { qIdx++; renderQuestion(); return; }
-  feedbackEl.innerHTML += '<div class="final">시험 종료! 최종 점수: ' + score + ' / ' + quizOrder.length + '</div>';
+  const label = isPractice ? '연습 종료! 최종 점수: ' : '시험 종료! 최종 점수: ';
+  feedbackEl.innerHTML += '<div class="final">' + label + score + ' / ' + quizOrder.length + '</div>';
   showWrongList();
-  await Api.submitAttempt(exam.id, me.id, score, quizOrder.length, wrongAnswers.map(w => ({
-    word: w.q.data.gr, chosen: w.chosen, correct: w.correct
-  })));
+  if (exam.id) {
+    // 시험 모드: 응시 기록을 저장합니다 (1회 제한).
+    await Api.submitAttempt(exam.id, me.id, score, quizOrder.length, wrongAnswers.map(w => ({
+      word: w.q.data.gr, chosen: w.chosen, correct: w.correct
+    })));
+  } else {
+    // 자율 연습 모드: 기록을 남기지 않고, 원하면 바로 다시 연습할 수 있습니다.
+    document.getElementById('retryBtn').style.display = 'inline-block';
+  }
 }
 
 function showWrongList() {
@@ -231,6 +253,7 @@ function showWrongList() {
 }
 
 document.getElementById('backBtn').addEventListener('click', () => { window.location.href = 'student.html'; });
+document.getElementById('retryBtn').addEventListener('click', launchQuiz);
 
 init();
 </script>
