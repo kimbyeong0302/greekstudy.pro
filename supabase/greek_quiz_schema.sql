@@ -93,7 +93,7 @@ begin
 
   insert into greek_quiz.group_members (group_id, student_id)
   values (v_group_id, auth.uid())
-  on conflict (group_id, student_id) do nothing;
+  on conflict on constraint group_members_pkey do nothing;
 
   return query select v_group_id, v_group_name;
 end;
