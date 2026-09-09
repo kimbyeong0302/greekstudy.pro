@@ -24,6 +24,12 @@ h1 { font-size: 20px; margin:0; font-weight:700; }
 .exam-item button.done { background:#e6f6ea; color:#2e9e4f; cursor:default; }
 .empty { color:#999; font-size:13px; text-align:center; padding:12px 0; }
 .err { color:#d64545; font-size:13px; margin-top:8px; display:none; }
+.chk-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+.chk-row label { font-size:13px; background:#f0ede6; padding:6px 10px; border-radius:8px; cursor:pointer; }
+.lv-row { display:flex; gap:6px; margin-bottom:10px; }
+.lv-row button { flex:1; padding:8px 4px; font-size:12px; border-radius:8px; border:1.5px solid #ddd; background:#fff; cursor:pointer; }
+.lv-row button.active { border-color:#2e6ed6; background:#eaf1fd; color:#2e6ed6; font-weight:700; }
+.wide-btn { width:100%; padding:11px; font-size:14px; font-weight:700; border-radius:10px; border:none; background:#2e6ed6; color:#fff; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -56,12 +62,24 @@ h1 { font-size: 20px; margin:0; font-weight:700; }
     <div class="card-title">응시 가능한 시험</div>
     <div id="examList" class="empty">불러오는 중...</div>
   </div>
+
+  <div class="card">
+    <div class="card-title">자율 연습</div>
+    <div id="practiceWeekChks" class="chk-row"><span style="color:#999;font-size:13px;">불러오는 중...</span></div>
+    <div class="lv-row" id="practiceLvRow">
+      <button class="active" data-lv="1">1단계</button>
+      <button data-lv="2">2단계</button>
+      <button data-lv="3">3단계</button>
+    </div>
+    <button class="wide-btn" id="startPracticeBtn">연습 시작</button>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script>
 let me = null;
+let practiceLevel = 1;
 
 async function init() {
   const session = await Auth.getSession();
@@ -72,6 +90,15 @@ async function init() {
   await loadGroups();
   await loadExams();
   await loadNotices();
+  await loadPracticeWeeks();
+}
+
+async function loadPracticeWeeks() {
+  const { data } = await sb.from('words').select('week');
+  const weeks = [...new Set((data || []).map(w => w.week))].sort((a, b) => a - b);
+  const el = document.getElementById('practiceWeekChks');
+  if (weeks.length === 0) { el.textContent = '등록된 단어가 없습니다.'; return; }
+  el.innerHTML = weeks.map(w => `<label><input type="checkbox" value="${w}" checked> ${w}주차</label>`).join('');
 }
 
 function escapeHtml(str) {
@@ -139,6 +166,18 @@ document.getElementById('joinBtn').addEventListener('click', async () => {
   await loadGroups();
   await loadExams();
   await loadNotices();
+});
+
+document.getElementById('practiceLvRow').addEventListener('click', e => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  document.querySelectorAll('#practiceLvRow button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active'); practiceLevel = parseInt(btn.dataset.lv);
+});
+
+document.getElementById('startPracticeBtn').addEventListener('click', () => {
+  const weeks = [...document.querySelectorAll('#practiceWeekChks input:checked')].map(c => c.value);
+  if (weeks.length === 0) { alert('주차를 하나 이상 선택하세요.'); return; }
+  window.location.href = `quiz.html?practice=1&weeks=${weeks.join(',')}&level=${practiceLevel}`;
 });
 
 document.getElementById('logoutBtn').addEventListener('click', async () => {
