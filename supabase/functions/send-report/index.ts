@@ -46,11 +46,20 @@ Deno.serve(async (req) => {
 
     const { data: exam, error: examErr } = await sb
       .from("exams")
-      .select("*, groups(name, professor_id)")
+      .select("*")
       .eq("id", examId)
       .maybeSingle();
-    if (examErr || !exam) throw new Error("시험을 찾을 수 없습니다.");
-    if (exam.groups.professor_id !== uid) throw new Error("본인 그룹의 시험만 조회할 수 있습니다.");
+    if (examErr) throw new Error("시험 조회 오류: " + examErr.message);
+    if (!exam) throw new Error("시험을 찾을 수 없습니다. (id: " + examId + ")");
+
+    const { data: grp, error: grpErr } = await sb
+      .from("groups")
+      .select("name, professor_id")
+      .eq("id", exam.group_id)
+      .maybeSingle();
+    if (grpErr) throw new Error("그룹 조회 오류: " + grpErr.message);
+    if (!grp) throw new Error("그룹을 찾을 수 없습니다.");
+    if (grp.professor_id !== uid) throw new Error("본인 그룹의 시험만 조회할 수 있습니다.");
 
     const { data: attempts, error: attErr } = await sb
       .from("attempts")
@@ -59,7 +68,7 @@ Deno.serve(async (req) => {
       .order("submitted_at", { ascending: true });
     if (attErr) throw attErr;
 
-    const groupName = exam.groups.name;
+    const groupName = grp.name;
     const weeksLabel = exam.weeks.join(", ") + "주차";
     const subject = `[${groupName}] ${weeksLabel} 단어시험 결과`;
 
