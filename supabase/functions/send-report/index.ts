@@ -6,9 +6,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import * as XLSX from "npm:xlsx@0.18.5";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-// 도메인 인증 전에는 Resend의 테스트 발신 주소를 사용하세요 (onboarding@resend.dev).
-// 자체 도메인을 Resend에 인증한 뒤에는 그 도메인의 주소로 바꾸세요.
 const FROM_ADDRESS = Deno.env.get("REPORT_FROM_ADDRESS") || "onboarding@resend.dev";
 
 function corsHeaders() {
@@ -27,10 +26,9 @@ Deno.serve(async (req) => {
     const jwt = authHeader.replace("Bearer ", "");
     if (!jwt) throw new Error("인증되지 않았습니다.");
 
-    // 요청한 사람의 JWT로 클라이언트를 만들면, 이후 모든 쿼리가 RLS로 그 사람 권한만큼만 보임.
-    const sb = createClient(SUPABASE_URL, jwt, {
-      db: { schema: "greek_quiz" },
-      global: { headers: { Authorization: authHeader } }
+    // 서비스 롤 키로 클라이언트 생성 후 JWT 검증. 이후 데이터 쿼리는 명시적 uid 검사로 권한 확인.
+    const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      db: { schema: "greek_quiz" }
     });
 
     const { data: userData, error: userErr } = await sb.auth.getUser(jwt);
