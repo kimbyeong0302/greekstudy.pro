@@ -80,7 +80,7 @@ const Api = {
   // ---- 교수용 ----
   // 가입 코드는 이제 교수가 직접 입력한 숫자 4자리를 그대로 사용합니다(자동 생성 안 함).
   async createGroup(professorId, name, code) {
-    return sb.from('groups').insert({ professor_id: professorId, name, join_code: code }).select().single();
+    return sb.from('groups').insert({ professor_id: professorId, name, join_code: code });
   },
   async myGroups(professorId) {
     return sb.from('groups').select('*').eq('professor_id', professorId).order('created_at', { ascending: false });

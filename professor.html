@@ -288,14 +288,15 @@ document.getElementById('createGroupBtn').addEventListener('click', async () => 
   if (!/^\d{4}$/.test(code)) { msgEl.textContent = '가입 코드는 숫자 4자리로 입력해주세요.'; msgEl.classList.add('err'); return; }
   const { error } = await Api.createGroup(me.id, name, code);
   if (error) {
-    // 코드 중복(unique 제약 위반)인 경우 알기 쉬운 안내로 바꿔서 보여줍니다.
     const dup = error.code === '23505' || (error.message || '').toLowerCase().includes('duplicate');
-    msgEl.textContent = dup ? '이미 사용 중인 코드입니다. 다른 숫자 4자리를 입력해주세요.' : error.message;
+    msgEl.textContent = dup ? '이미 사용 중인 코드입니다. 다른 숫자 4자리를 입력해주세요.' : (error.message || '그룹 생성에 실패했습니다.');
     msgEl.classList.add('err');
     return;
   }
   document.getElementById('groupNameInput').value = '';
   document.getElementById('groupCodeInput').value = '';
+  msgEl.textContent = '그룹이 생성되었습니다.';
+  msgEl.classList.add('ok');
   await loadGroups();
 });
 
