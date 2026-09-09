@@ -33,10 +33,12 @@ Deno.serve(async (req) => {
 
     const { data: userData, error: userErr } = await sb.auth.getUser(jwt);
     if (userErr || !userData.user) throw new Error("사용자 확인 실패");
-    const uid = userData.user.id;
+    const user = userData.user;
+    const uid = user.id;
 
-    const { data: professor, error: profErr } = await sb.from("professors").select("*").eq("id", uid).maybeSingle();
-    if (profErr || !professor) throw new Error("교수 계정만 사용할 수 있습니다.");
+    // user_metadata에 role=professor 가 있어야 교수 계정
+    if (user.user_metadata?.role !== "professor") throw new Error("교수 계정만 사용할 수 있습니다.");
+    const professorEmail = user.email!;
 
     const { examId } = await req.json();
     if (!examId) throw new Error("examId가 필요합니다.");
@@ -78,7 +80,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         from: FROM_ADDRESS,
-        to: professor.email,
+        to: professorEmail,
         subject,
         html: `<p>${groupName} - ${exam.weeks.join(", ")}주차 단어시험 결과입니다. 응시자 ${rows.length}명.</p>`,
         attachments: [{
