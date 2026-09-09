@@ -68,10 +68,17 @@ const Auth = {
   },
   // 로그인한 사용자가 교수/학생/관리자 중 무엇인지 확인
   async getRole(userId) {
-    const { data: prof } = await sb.from('professors').select('id').eq('id', userId).maybeSingle();
-    if (prof) return 'professor';
+    // user_metadata.role 이 있으면 DB 조회 없이 즉시 반환
+    const { data: { user } } = await sb.auth.getUser();
+    const metaRole = user?.user_metadata?.role;
+    if (metaRole === 'professor') return 'professor';
+    if (metaRole === 'admin') return 'admin';
+    // 학생은 가입 시 metadata에 role을 넣지 않으므로 DB 확인
     const { data: stu } = await sb.from('students').select('id').eq('id', userId).maybeSingle();
     if (stu) return 'student';
+    // metadata가 없는 교수 계정 대비 폴백
+    const { data: prof } = await sb.from('professors').select('id').eq('id', userId).maybeSingle();
+    if (prof) return 'professor';
     return null;
   }
 };
@@ -171,6 +178,21 @@ const Api = {
   },
 
   // ---- 관리자용 (앱 소유자 전용, RLS가 role='admin'인 계정만 허용) ----
+  async resetPassword(userId) {
+    const session = await Auth.getSession();
+    const res = await fetch(SUPABASE_URL + '/functions/v1/reset-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + session.access_token
+      },
+      body: JSON.stringify({ userId })
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || '초기화 실패');
+    return json;
+  },
   async adminAllProfessors() {
     return sb.from('professors').select('*').order('created_at', { ascending: false });
   },

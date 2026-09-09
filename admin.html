@@ -3,201 +3,205 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<title>관리자</title>
-<script>(function(){var v='2026-09-09-1',s=localStorage.getItem('appVersion');if(s&&s!==v){localStorage.setItem('appVersion',v);location.reload(true);}else localStorage.setItem('appVersion',v);})();</script>
+<title>관리자 대시보드</title>
 <style>
 * { box-sizing: border-box; }
 body { margin:0; font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; background:#f4f1ea; color:#222; }
 .screen { max-width: 640px; margin: 0 auto; padding: 24px 16px 72px; }
 .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
 h1 { font-size: 20px; margin:0; font-weight:700; }
+.badge { font-size:11px; background:#d64545; color:#fff; padding:3px 8px; border-radius:20px; margin-left:8px; font-weight:700; }
 #logoutBtn { font-size:12px; color:#888; background:none; border:1px solid #ddd; border-radius:8px; padding:6px 10px; cursor:pointer; }
 .card { background:#fff; border-radius:16px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
 .card-title { font-size:11px; font-weight:700; color:#aaa; letter-spacing:0.8px; text-transform:uppercase; margin:0 0 12px; }
-table { width:100%; border-collapse:collapse; font-size:13px; }
-th, td { text-align:left; padding:6px 4px; border-bottom:1px solid #eee; }
-.badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#eaf1fd; color:#2e6ed6; }
-.empty { color:#999; font-size:13px; text-align:center; padding:12px 0; }
-.stat-row { display:flex; gap:10px; }
-.stat { flex:1; background:#fff; border-radius:14px; padding:16px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
-.stat .n { font-size:22px; font-weight:800; color:#2e6ed6; }
-.stat .l { font-size:12px; color:#888; margin-top:4px; }
 .row { display:flex; gap:8px; }
-.row input { flex:1; padding:11px 12px; font-size:15px; border-radius:10px; border:1.5px solid #ddd; }
-.row button { padding:11px 16px; font-size:14px; font-weight:700; border-radius:10px; border:none; background:#2e6ed6; color:#fff; cursor:pointer; }
-.msg { font-size:12px; margin-top:6px; }
+.row input { flex:1; padding:11px 12px; font-size:14px; border-radius:10px; border:1.5px solid #ddd; }
+.row button { padding:10px 14px; font-size:13px; font-weight:700; border-radius:10px; border:none; background:#2e6ed6; color:#fff; cursor:pointer; white-space:nowrap; }
+.btn-sm { padding:5px 10px; font-size:12px; font-weight:600; border-radius:8px; border:1.5px solid #ddd; background:#fff; cursor:pointer; }
+.btn-sm.danger { color:#d64545; border-color:#f0c9c9; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:left; padding:6px 8px; border-bottom:2px solid #eee; color:#888; font-size:11px; font-weight:700; letter-spacing:0.5px; }
+td { padding:8px 8px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+.empty { color:#999; font-size:13px; text-align:center; padding:16px 0; }
+.msg { font-size:12px; margin-top:8px; display:none; }
 .msg.ok { color:#2e9e4f; } .msg.err { color:#d64545; }
-.top-right{display:flex;align-items:center;gap:8px;}
-.bell-btn{position:relative;background:none;border:none;cursor:pointer;padding:4px 6px;font-size:20px;line-height:1;}
-.bell-badge{position:absolute;top:-2px;right:-2px;background:#e53e3e;color:#fff;border-radius:999px;font-size:10px;font-weight:700;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;display:none;}
-.bell-badge.show{display:block;}
-.update-dropdown-wrap{position:relative;}
-.update-dropdown{position:absolute;top:calc(100% + 6px);right:0;width:270px;background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14px;z-index:100;display:none;}
-.update-dropdown.show{display:block;}
-.update-title{font-size:11px;font-weight:700;color:#aaa;letter-spacing:0.8px;text-transform:uppercase;margin:0 0 10px;}
-.update-item{padding:8px 0;border-bottom:1px solid #f0ede6;}
-.update-item:last-child{border-bottom:none;padding-bottom:0;}
-.u-date{font-size:11px;color:#aaa;margin-bottom:2px;}
-.u-text{font-size:13px;color:#333;line-height:1.5;}
+.notice-item { display:flex; justify-content:space-between; align-items:flex-start; padding:8px 0; border-bottom:1px solid #f0f0f0; gap:10px; }
+.notice-item:last-child { border-bottom:none; }
+.notice-content { font-size:14px; flex:1; }
+.notice-date { font-size:11px; color:#aaa; margin-top:3px; }
+.stat-row { display:flex; gap:10px; margin-bottom:14px; }
+.stat { flex:1; background:#fff; border-radius:12px; padding:14px 10px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
+.stat-num { font-size:24px; font-weight:800; color:#2e6ed6; }
+.stat-lbl { font-size:11px; color:#888; margin-top:2px; }
 </style>
 </head>
 <body>
 <div class="screen">
   <div class="top">
-    <h1>관리자 대시보드 <span class="badge">전체 보기</span></h1>
-    <div class="top-right">
-      <div class="update-dropdown-wrap">
-        <button class="bell-btn" id="bellBtn">🔔<span class="bell-badge" id="bellBadge"></span></button>
-        <div class="update-dropdown" id="updateDropdown">
-          <div class="update-title">업데이트 내역</div>
-          <div id="updateList"></div>
-        </div>
-      </div>
-      <button id="logoutBtn">로그아웃</button>
-    </div>
+    <h1>관리자 대시보드 <span class="badge">ADMIN</span></h1>
+    <button id="logoutBtn">로그아웃</button>
   </div>
 
-  <div class="stat-row" id="statRow" style="margin-bottom:14px"></div>
+  <div class="stat-row">
+    <div class="stat"><div class="stat-num" id="statProf">-</div><div class="stat-lbl">교수</div></div>
+    <div class="stat"><div class="stat-num" id="statStu">-</div><div class="stat-lbl">학생</div></div>
+    <div class="stat"><div class="stat-num" id="statGrp">-</div><div class="stat-lbl">그룹</div></div>
+    <div class="stat"><div class="stat-num" id="statExam">-</div><div class="stat-lbl">시험</div></div>
+  </div>
 
   <div class="card">
-    <div class="card-title">시스템 공지 등록 (모든 교수/학생에게 표시)</div>
+    <div class="card-title">전체 공지사항</div>
     <div class="row">
-      <input type="text" id="sysNoticeInput" placeholder="예: 9/10 새벽 서버 업그레이드 예정">
-      <button id="postSysNoticeBtn">등록</button>
+      <input type="text" id="noticeInput" placeholder="모든 학생·교수에게 보낼 공지 내용">
+      <button onclick="postNotice()">등록</button>
     </div>
-    <div class="msg" id="sysNoticeMsg"></div>
-    <div id="sysNoticeList" class="empty" style="margin-top:10px">불러오는 중...</div>
+    <div class="msg" id="noticeMsg"></div>
+    <div id="noticeList" style="margin-top:12px;"></div>
   </div>
 
   <div class="card">
-    <div class="card-title">전체 교수</div>
-    <div id="profTable" class="empty">불러오는 중...</div>
+    <div class="card-title">교수 관리</div>
+    <div id="profList" class="empty">불러오는 중...</div>
   </div>
 
   <div class="card">
-    <div class="card-title">전체 그룹(과목)</div>
-    <div id="groupTable" class="empty">불러오는 중...</div>
+    <div class="card-title">학생 관리</div>
+    <div id="stuList" class="empty">불러오는 중...</div>
   </div>
 
   <div class="card">
-    <div class="card-title">전체 학생</div>
-    <div id="studentTable" class="empty">불러오는 중...</div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">전체 시험 및 응시 현황</div>
-    <div id="examTable" class="empty">불러오는 중...</div>
+    <div class="card-title">그룹 현황</div>
+    <div id="grpList" class="empty">불러오는 중...</div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script>
-const APP_UPDATES = [
-  { date: '2026-09-09', text: '그룹 가입 코드가 숫자 4자리 방식으로 변경되었습니다.' },
-  { date: '2026-09-01', text: '교수 가입 시 이메일 인증 기능이 추가되었습니다.' },
-];
-(function(){
-  const lastSeen = localStorage.getItem('updateLastSeen') || '1970-01-01';
-  const unread = APP_UPDATES.filter(u => u.date > lastSeen);
-  const badge = document.getElementById('bellBadge');
-  const dropdown = document.getElementById('updateDropdown');
-  const bell = document.getElementById('bellBtn');
-  const list = document.getElementById('updateList');
-  if(unread.length > 0){ badge.textContent = unread.length > 9 ? '9+' : String(unread.length); badge.classList.add('show'); }
-  list.innerHTML = APP_UPDATES.map(u => `<div class="update-item"><div class="u-date">${u.date}</div><div class="u-text">${u.text}</div></div>`).join('');
-  bell.addEventListener('click', e => {
-    e.stopPropagation();
-    if(!dropdown.classList.contains('show')){
-      localStorage.setItem('updateLastSeen', new Date().toISOString().slice(0,10));
-      badge.classList.remove('show');
-    }
-    dropdown.classList.toggle('show');
-  });
-  document.addEventListener('click', () => dropdown.classList.remove('show'));
-})();
+let me = null;
 
 function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-
-async function loadSysNotices() {
-  const { data } = await Api.systemNotices();
-  const el = document.getElementById('sysNoticeList');
-  if (!data || data.length === 0) { el.textContent = '등록된 시스템 공지가 없습니다.'; return; }
-  el.innerHTML = data.map(n => `
-    <div style="border-bottom:1px solid #eee; padding:8px 0;">
-      <div style="font-size:14px;">${escapeHtml(n.content)}</div>
-      <div style="font-size:11px; color:#999; margin-top:4px; display:flex; justify-content:space-between;">
-        <span>${new Date(n.created_at).toLocaleString('ko-KR')}</span>
-        <button class="del-sys-notice-btn" data-id="${n.id}" style="font-size:11px; color:#999; background:none; border:none; cursor:pointer;">삭제</button>
-      </div>
-    </div>
-  `).join('');
-  el.querySelectorAll('.del-sys-notice-btn').forEach(b => {
-    b.addEventListener('click', async () => {
-      if (!confirm('이 시스템 공지를 삭제하시겠습니까?')) return;
-      await Api.deleteNotice(b.dataset.id);
-      loadSysNotices();
-    });
-  });
-}
-
-document.getElementById('postSysNoticeBtn').addEventListener('click', async () => {
-  const input = document.getElementById('sysNoticeInput');
-  const content = input.value.trim();
-  const msgEl = document.getElementById('sysNoticeMsg');
-  msgEl.className = 'msg';
-  if (!content) return;
-  const { error } = await Api.createSystemNotice(content);
-  if (error) { msgEl.textContent = error.message; msgEl.classList.add('err'); return; }
-  input.value = '';
-  msgEl.textContent = '시스템 공지가 등록되었습니다.';
-  msgEl.classList.add('ok');
-  await loadSysNotices();
-});
 
 async function init() {
   const session = await Auth.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
   const role = await Auth.getRole(session.user.id);
   if (role !== 'admin') { window.location.href = 'index.html'; return; }
+  me = session.user;
+  await Promise.all([loadStats(), loadNotices(), loadProfessors(), loadStudents(), loadGroups()]);
+}
 
-  await loadSysNotices();
-
-  const [{ data: profs }, { data: groups }, { data: students }, { data: exams }] = await Promise.all([
-    Api.adminAllProfessors(), Api.adminAllGroups(), Api.adminAllStudents(), Api.adminAllExamsWithAttemptCount()
+async function loadStats() {
+  const [p, s, g, e] = await Promise.all([
+    Api.adminAllProfessors(),
+    Api.adminAllStudents(),
+    Api.adminAllGroups(),
+    Api.adminAllExamsWithAttemptCount()
   ]);
+  document.getElementById('statProf').textContent = (p.data || []).length;
+  document.getElementById('statStu').textContent = (s.data || []).length;
+  document.getElementById('statGrp').textContent = (g.data || []).length;
+  document.getElementById('statExam').textContent = (e.data || []).length;
+}
 
-  document.getElementById('statRow').innerHTML = `
-    <div class="stat"><div class="n">${(profs||[]).length}</div><div class="l">교수</div></div>
-    <div class="stat"><div class="n">${(groups||[]).length}</div><div class="l">그룹</div></div>
-    <div class="stat"><div class="n">${(students||[]).length}</div><div class="l">학생</div></div>
-    <div class="stat"><div class="n">${(exams||[]).length}</div><div class="l">시험</div></div>
-  `;
+async function loadNotices() {
+  const { data } = await Api.systemNotices();
+  const el = document.getElementById('noticeList');
+  if (!data || data.length === 0) {
+    el.innerHTML = '<div class="empty">등록된 전체 공지가 없습니다.</div>'; return;
+  }
+  el.innerHTML = data.map(n => `
+    <div class="notice-item">
+      <div style="flex:1">
+        <div class="notice-content">${escapeHtml(n.content)}</div>
+        <div class="notice-date">${new Date(n.created_at).toLocaleString('ko-KR')}</div>
+      </div>
+      <button class="btn-sm danger" onclick="deleteNotice('${n.id}')">삭제</button>
+    </div>`).join('');
+}
 
-  const profEl = document.getElementById('profTable');
-  profEl.innerHTML = (!profs || profs.length === 0) ? '' : `<table><tr><th>이름</th><th>이메일</th><th>가입일</th></tr>` +
-    profs.map(p => `<tr><td>${p.name}</td><td>${p.email}</td><td>${new Date(p.created_at).toLocaleDateString('ko-KR')}</td></tr>`).join('') + `</table>`;
-  if (!profs || profs.length === 0) profEl.textContent = '아직 없습니다.';
+async function postNotice() {
+  const input = document.getElementById('noticeInput');
+  const content = input.value.trim();
+  const msgEl = document.getElementById('noticeMsg');
+  msgEl.className = 'msg'; msgEl.style.display = 'none';
+  if (!content) return;
+  const { error } = await Api.createSystemNotice(content);
+  if (error) {
+    msgEl.textContent = error.message; msgEl.className = 'msg err'; msgEl.style.display = 'block'; return;
+  }
+  input.value = '';
+  msgEl.textContent = '공지가 등록되었습니다.'; msgEl.className = 'msg ok'; msgEl.style.display = 'block';
+  await loadNotices();
+}
 
-  const groupEl = document.getElementById('groupTable');
-  if (!groups || groups.length === 0) { groupEl.textContent = '아직 없습니다.'; }
-  else groupEl.innerHTML = `<table><tr><th>그룹명</th><th>담당 교수</th><th>가입코드</th></tr>` +
-    groups.map(g => `<tr><td>${g.name}</td><td>${g.professors ? g.professors.name : ''}</td><td>${g.join_code}</td></tr>`).join('') + `</table>`;
+async function deleteNotice(id) {
+  if (!confirm('이 공지를 삭제하시겠습니까?')) return;
+  await Api.deleteNotice(id);
+  await loadNotices();
+}
 
-  const studentEl = document.getElementById('studentTable');
-  if (!students || students.length === 0) { studentEl.textContent = '아직 없습니다.'; }
-  else studentEl.innerHTML = `<table><tr><th>학번</th><th>이름</th><th>구분</th></tr>` +
-    students.map(s => `<tr><td>${s.student_number}</td><td>${s.name}</td><td>${s.role === 'admin' ? '관리자' : '학생'}</td></tr>`).join('') + `</table>`;
+async function loadProfessors() {
+  const { data } = await Api.adminAllProfessors();
+  const el = document.getElementById('profList');
+  if (!data || data.length === 0) { el.innerHTML = '<div class="empty">등록된 교수가 없습니다.</div>'; return; }
+  el.innerHTML = `
+    <table>
+      <tr><th>이름</th><th>이메일</th><th>가입일</th><th></th></tr>
+      ${data.map(p => `
+        <tr>
+          <td><b>${escapeHtml(p.name)}</b></td>
+          <td style="color:#555;font-size:12px;">${escapeHtml(p.email)}</td>
+          <td style="color:#aaa;font-size:12px;">${new Date(p.created_at).toLocaleDateString('ko-KR')}</td>
+          <td><button class="btn-sm" onclick="resetPw('${p.id}','${escapeHtml(p.name)}')">비번 초기화</button></td>
+        </tr>`).join('')}
+    </table>`;
+}
 
-  const examEl = document.getElementById('examTable');
-  if (!exams || exams.length === 0) { examEl.textContent = '아직 없습니다.'; }
-  else examEl.innerHTML = `<table><tr><th>그룹</th><th>주차</th><th>단계</th><th>응시 수</th></tr>` +
-    exams.map(e => `<tr><td>${e.groups ? e.groups.name : ''}</td><td>${e.weeks.join(',')}</td><td>${e.level}단계</td><td>${e.attempts && e.attempts[0] ? e.attempts[0].count : 0}</td></tr>`).join('') + `</table>`;
+async function loadStudents() {
+  const { data } = await Api.adminAllStudents();
+  const el = document.getElementById('stuList');
+  if (!data || data.length === 0) { el.innerHTML = '<div class="empty">등록된 학생이 없습니다.</div>'; return; }
+  el.innerHTML = `
+    <table>
+      <tr><th>학번</th><th>이름</th><th>가입일</th><th></th></tr>
+      ${data.map(s => `
+        <tr>
+          <td style="font-weight:600;">${escapeHtml(s.student_number)}</td>
+          <td>${escapeHtml(s.name)}</td>
+          <td style="color:#aaa;font-size:12px;">${new Date(s.created_at).toLocaleDateString('ko-KR')}</td>
+          <td><button class="btn-sm" onclick="resetPw('${s.id}','${escapeHtml(s.name)}')">비번 초기화</button></td>
+        </tr>`).join('')}
+    </table>`;
+}
+
+async function loadGroups() {
+  const { data } = await Api.adminAllGroups();
+  const el = document.getElementById('grpList');
+  if (!data || data.length === 0) { el.innerHTML = '<div class="empty">등록된 그룹이 없습니다.</div>'; return; }
+  el.innerHTML = `
+    <table>
+      <tr><th>그룹명</th><th>교수</th><th>가입 코드</th><th>생성일</th></tr>
+      ${data.map(g => `
+        <tr>
+          <td><b>${escapeHtml(g.name)}</b></td>
+          <td style="color:#555;font-size:12px;">${escapeHtml(g.professors?.name ?? '-')}</td>
+          <td style="color:#2e6ed6;font-weight:700;">${escapeHtml(g.join_code)}</td>
+          <td style="color:#aaa;font-size:12px;">${new Date(g.created_at).toLocaleDateString('ko-KR')}</td>
+        </tr>`).join('')}
+    </table>`;
+}
+
+async function resetPw(userId, name) {
+  if (!confirm(`"${name}"의 비밀번호를 "0000"으로 초기화하시겠습니까?`)) return;
+  try {
+    await Api.resetPassword(userId);
+    alert(`"${name}"의 비밀번호가 0000으로 초기화되었습니다.`);
+  } catch (err) {
+    alert('초기화 실패: ' + err.message);
+  }
 }
 
 document.getElementById('logoutBtn').addEventListener('click', async () => {
