@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
 
     const { data: attempts, error: attErr } = await sb
       .from("attempts")
-      .select("score, total, wrong_answers, submitted_at, students(student_number, name)")
+      .select("score, total, submitted_at, students(student_number, name)")
       .eq("exam_id", examId)
       .order("submitted_at", { ascending: true });
     if (attErr) throw attErr;
@@ -81,7 +81,6 @@ Deno.serve(async (req) => {
           <td style="padding:8px 12px;border-bottom:1px solid #eee;">${a.students?.student_number ?? "-"}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #eee;">${a.students?.name ?? "-"}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">${a.score} / ${a.total}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #eee;">${(a.wrong_answers || []).map((w: any) => w.word).join(", ") || "없음"}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:12px;color:#999;">${new Date(a.submitted_at).toLocaleString("ko-KR")}</td>
         </tr>`).join("");
       tableHtml = `
@@ -91,7 +90,6 @@ Deno.serve(async (req) => {
               <th style="padding:10px 12px;text-align:left;">학번</th>
               <th style="padding:10px 12px;text-align:left;">이름</th>
               <th style="padding:10px 12px;text-align:center;">점수</th>
-              <th style="padding:10px 12px;text-align:left;">틀린 단어</th>
               <th style="padding:10px 12px;text-align:left;">응시 시각</th>
             </tr>
           </thead>
