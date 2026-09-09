@@ -14,7 +14,7 @@ const FROM_ADDRESS = Deno.env.get("REPORT_FROM_ADDRESS") || "onboarding@resend.d
 // 인증 완료 후 돌아갈 주소. Supabase Auth 설정의 Redirect URLs 목록에 이 주소(또는
 // 이 주소가 포함되는 패턴, 예: https://kimbyeong0302.github.io/greekstudy.pro/*)가
 // 등록되어 있어야 합니다 (Authentication → URL Configuration).
-const SITE_URL = Deno.env.get("SITE_URL") || "https://kimbyeong0302.github.io/greekstudy.pro/index.html";
+const SITE_URL = Deno.env.get("SITE_URL") || "https://kimbyeong0302.github.io/greekstudy.pro/verified.html";
 
 function corsHeaders() {
   return {
