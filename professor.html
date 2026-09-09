@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>교수 대시보드</title>
+<script>(function(){var v='2026-09-09-1',s=localStorage.getItem('appVersion');if(s&&s!==v){localStorage.setItem('appVersion',v);location.reload(true);}else localStorage.setItem('appVersion',v);})();</script>
 <style>
 * { box-sizing: border-box; }
 body { margin:0; font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; background:#f4f1ea; color:#222; }
@@ -34,13 +38,34 @@ th, td { text-align:left; padding:6px 4px; border-bottom:1px solid #eee; }
 .empty { color:#999; font-size:13px; text-align:center; padding:12px 0; }
 .msg { font-size:12px; margin-top:6px; }
 .msg.ok { color:#2e9e4f; } .msg.err { color:#d64545; }
+.top-right{display:flex;align-items:center;gap:8px;}
+.bell-btn{position:relative;background:none;border:none;cursor:pointer;padding:4px 6px;font-size:20px;line-height:1;}
+.bell-badge{position:absolute;top:-2px;right:-2px;background:#e53e3e;color:#fff;border-radius:999px;font-size:10px;font-weight:700;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;display:none;}
+.bell-badge.show{display:block;}
+.update-dropdown-wrap{position:relative;}
+.update-dropdown{position:absolute;top:calc(100% + 6px);right:0;width:270px;background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14px;z-index:100;display:none;}
+.update-dropdown.show{display:block;}
+.update-title{font-size:11px;font-weight:700;color:#aaa;letter-spacing:0.8px;text-transform:uppercase;margin:0 0 10px;}
+.update-item{padding:8px 0;border-bottom:1px solid #f0ede6;}
+.update-item:last-child{border-bottom:none;padding-bottom:0;}
+.u-date{font-size:11px;color:#aaa;margin-bottom:2px;}
+.u-text{font-size:13px;color:#333;line-height:1.5;}
 </style>
 </head>
 <body>
 <div class="screen">
   <div class="top">
     <h1>교수 대시보드</h1>
-    <button id="logoutBtn">로그아웃</button>
+    <div class="top-right">
+      <div class="update-dropdown-wrap">
+        <button class="bell-btn" id="bellBtn">🔔<span class="bell-badge" id="bellBadge"></span></button>
+        <div class="update-dropdown" id="updateDropdown">
+          <div class="update-title">업데이트 내역</div>
+          <div id="updateList"></div>
+        </div>
+      </div>
+      <button id="logoutBtn">로그아웃</button>
+    </div>
   </div>
 
   <div class="card">
@@ -56,6 +81,21 @@ th, td { text-align:left; padding:6px 4px; border-bottom:1px solid #eee; }
   <div class="card">
     <div class="card-title">내 그룹</div>
     <div id="groupList" class="empty">불러오는 중...</div>
+  </div>
+
+  <div class="card" id="memberListCard" style="display:none">
+    <div class="card-title">그룹 학생 명단 (<span id="memberCount">0</span>명 · 가나다순)</div>
+    <div id="memberList" class="empty">그룹을 선택하세요.</div>
+  </div>
+
+  <div class="card" id="noticeCard" style="display:none">
+    <div class="card-title">그룹 공지사항</div>
+    <div class="row">
+      <input type="text" id="noticeInput" placeholder="학생들에게 보낼 공지 내용">
+      <button id="postNoticeBtn">등록</button>
+    </div>
+    <div class="msg" id="noticeMsg"></div>
+    <div id="noticeList" class="empty" style="margin-top:10px">불러오는 중...</div>
   </div>
 
   <div class="card" id="examSetupCard" style="display:none">
@@ -83,6 +123,30 @@ th, td { text-align:left; padding:6px 4px; border-bottom:1px solid #eee; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script>
+const APP_UPDATES = [
+  { date: '2026-09-09', text: '그룹 가입 코드가 숫자 4자리 방식으로 변경되었습니다.' },
+  { date: '2026-09-01', text: '교수 가입 시 이메일 인증 기능이 추가되었습니다.' },
+];
+(function(){
+  const lastSeen = localStorage.getItem('updateLastSeen') || '1970-01-01';
+  const unread = APP_UPDATES.filter(u => u.date > lastSeen);
+  const badge = document.getElementById('bellBadge');
+  const dropdown = document.getElementById('updateDropdown');
+  const bell = document.getElementById('bellBtn');
+  const list = document.getElementById('updateList');
+  if(unread.length > 0){ badge.textContent = unread.length > 9 ? '9+' : String(unread.length); badge.classList.add('show'); }
+  list.innerHTML = APP_UPDATES.map(u => `<div class="update-item"><div class="u-date">${u.date}</div><div class="u-text">${u.text}</div></div>`).join('');
+  bell.addEventListener('click', e => {
+    e.stopPropagation();
+    if(!dropdown.classList.contains('show')){
+      localStorage.setItem('updateLastSeen', new Date().toISOString().slice(0,10));
+      badge.classList.remove('show');
+    }
+    dropdown.classList.toggle('show');
+  });
+  document.addEventListener('click', () => dropdown.classList.remove('show'));
+})();
+
 let me = null;
 let groups = [];
 let selectedGroupId = null;
@@ -106,28 +170,114 @@ async function loadWeekOptions() {
   el.innerHTML = weeks.map(w => `<label><input type="checkbox" value="${w}" checked> ${w}주차</label>`).join('');
 }
 
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
 async function loadGroups() {
   const { data } = await Api.myGroups(me.id);
   groups = data || [];
   const el = document.getElementById('groupList');
   if (groups.length === 0) { el.textContent = '아직 만든 그룹이 없습니다.'; return; }
+  const counts = await Promise.all(groups.map(g => Api.groupMemberCount(g.id)));
   el.innerHTML = '';
-  groups.forEach(g => {
+  groups.forEach((g, i) => {
     const div = document.createElement('div');
     div.className = 'group-item' + (g.id === selectedGroupId ? ' active' : '');
-    div.innerHTML = `<div>${g.name}</div><div class="code">가입 코드: ${g.join_code}</div>`;
-    div.addEventListener('click', () => selectGroup(g.id));
+    div.dataset.groupId = g.id;
+    div.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <div>${escapeHtml(g.name)}</div>
+        <button class="del-group-btn" data-id="${g.id}" data-name="${escapeHtml(g.name)}" style="font-size:11px; color:#d64545; background:none; border:1px solid #f0c9c9; border-radius:8px; padding:4px 8px; cursor:pointer;">삭제</button>
+      </div>
+      <div class="code">가입 코드: ${g.join_code} · 총 ${counts[i].count}명</div>
+    `;
     el.appendChild(div);
   });
 }
+
+document.getElementById('groupList').addEventListener('click', async (e) => {
+  const delBtn = e.target.closest('.del-group-btn');
+  if (delBtn) {
+    e.stopPropagation();
+    // 그룹 삭제는 되돌릴 수 없으므로 반드시 확인 팝업을 거칩니다.
+    const ok = confirm(`정말로 "${delBtn.dataset.name}" 그룹을 삭제하시겠습니까?\n이 그룹의 시험, 응시 기록, 공지사항이 모두 함께 삭제되며 되돌릴 수 없습니다.`);
+    if (!ok) return;
+    const { error } = await Api.deleteGroup(delBtn.dataset.id);
+    if (error) { alert(error.message); return; }
+    if (selectedGroupId === delBtn.dataset.id) {
+      selectedGroupId = null;
+      document.getElementById('examSetupCard').style.display = 'none';
+      document.getElementById('examListCard').style.display = 'none';
+      document.getElementById('memberListCard').style.display = 'none';
+      document.getElementById('noticeCard').style.display = 'none';
+    }
+    await loadGroups();
+    return;
+  }
+  const item = e.target.closest('.group-item');
+  if (item) selectGroup(item.dataset.groupId);
+});
 
 function selectGroup(groupId) {
   selectedGroupId = groupId;
   document.getElementById('examSetupCard').style.display = 'block';
   document.getElementById('examListCard').style.display = 'block';
+  document.getElementById('memberListCard').style.display = 'block';
+  document.getElementById('noticeCard').style.display = 'block';
   loadGroups();
   loadExams();
+  loadMembers(groupId);
+  loadNotices(groupId);
 }
+
+async function loadMembers(groupId) {
+  const { data } = await Api.groupMembers(groupId);
+  const sorted = (data || []).slice().sort((a, b) => a.students.name.localeCompare(b.students.name, 'ko'));
+  document.getElementById('memberCount').textContent = sorted.length;
+  const el = document.getElementById('memberList');
+  if (sorted.length === 0) { el.textContent = '아직 가입한 학생이 없습니다.'; return; }
+  el.innerHTML = `<table><tr><th>이름</th><th>학번</th></tr>` +
+    sorted.map(m => `<tr><td>${escapeHtml(m.students.name)}</td><td>${escapeHtml(m.students.student_number)}</td></tr>`).join('') +
+    `</table>`;
+}
+
+async function loadNotices(groupId) {
+  const { data } = await Api.groupNotices(groupId);
+  const el = document.getElementById('noticeList');
+  if (!data || data.length === 0) { el.textContent = '등록된 공지가 없습니다.'; return; }
+  el.innerHTML = data.map(n => `
+    <div style="border-bottom:1px solid #eee; padding:8px 0;">
+      <div style="font-size:14px;">${escapeHtml(n.content)}</div>
+      <div style="font-size:11px; color:#999; margin-top:4px; display:flex; justify-content:space-between;">
+        <span>${new Date(n.created_at).toLocaleString('ko-KR')}</span>
+        <button class="del-notice-btn" data-id="${n.id}" style="font-size:11px; color:#999; background:none; border:none; cursor:pointer;">삭제</button>
+      </div>
+    </div>
+  `).join('');
+  el.querySelectorAll('.del-notice-btn').forEach(b => {
+    b.addEventListener('click', async () => {
+      if (!confirm('이 공지를 삭제하시겠습니까?')) return;
+      await Api.deleteNotice(b.dataset.id);
+      loadNotices(groupId);
+    });
+  });
+}
+
+document.getElementById('postNoticeBtn').addEventListener('click', async () => {
+  const input = document.getElementById('noticeInput');
+  const content = input.value.trim();
+  const msgEl = document.getElementById('noticeMsg');
+  msgEl.className = 'msg';
+  if (!content) return;
+  if (!selectedGroupId) { msgEl.textContent = '그룹을 먼저 선택하세요.'; msgEl.classList.add('err'); return; }
+  const { error } = await Api.createGroupNotice(selectedGroupId, content);
+  if (error) { msgEl.textContent = error.message; msgEl.classList.add('err'); return; }
+  input.value = '';
+  msgEl.textContent = '공지가 등록되었습니다.';
+  msgEl.classList.add('ok');
+  await loadNotices(selectedGroupId);
+});
 
 document.getElementById('createGroupBtn').addEventListener('click', async () => {
   const name = document.getElementById('groupNameInput').value.trim();

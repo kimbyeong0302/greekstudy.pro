@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>관리자</title>
+<script>(function(){var v='2026-09-09-1',s=localStorage.getItem('appVersion');if(s&&s!==v){localStorage.setItem('appVersion',v);location.reload(true);}else localStorage.setItem('appVersion',v);})();</script>
 <style>
 * { box-sizing: border-box; }
 body { margin:0; font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; background:#f4f1ea; color:#222; }
@@ -21,16 +25,52 @@ th, td { text-align:left; padding:6px 4px; border-bottom:1px solid #eee; }
 .stat { flex:1; background:#fff; border-radius:14px; padding:16px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
 .stat .n { font-size:22px; font-weight:800; color:#2e6ed6; }
 .stat .l { font-size:12px; color:#888; margin-top:4px; }
+.row { display:flex; gap:8px; }
+.row input { flex:1; padding:11px 12px; font-size:15px; border-radius:10px; border:1.5px solid #ddd; }
+.row button { padding:11px 16px; font-size:14px; font-weight:700; border-radius:10px; border:none; background:#2e6ed6; color:#fff; cursor:pointer; }
+.msg { font-size:12px; margin-top:6px; }
+.msg.ok { color:#2e9e4f; } .msg.err { color:#d64545; }
+.top-right{display:flex;align-items:center;gap:8px;}
+.bell-btn{position:relative;background:none;border:none;cursor:pointer;padding:4px 6px;font-size:20px;line-height:1;}
+.bell-badge{position:absolute;top:-2px;right:-2px;background:#e53e3e;color:#fff;border-radius:999px;font-size:10px;font-weight:700;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;display:none;}
+.bell-badge.show{display:block;}
+.update-dropdown-wrap{position:relative;}
+.update-dropdown{position:absolute;top:calc(100% + 6px);right:0;width:270px;background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14px;z-index:100;display:none;}
+.update-dropdown.show{display:block;}
+.update-title{font-size:11px;font-weight:700;color:#aaa;letter-spacing:0.8px;text-transform:uppercase;margin:0 0 10px;}
+.update-item{padding:8px 0;border-bottom:1px solid #f0ede6;}
+.update-item:last-child{border-bottom:none;padding-bottom:0;}
+.u-date{font-size:11px;color:#aaa;margin-bottom:2px;}
+.u-text{font-size:13px;color:#333;line-height:1.5;}
 </style>
 </head>
 <body>
 <div class="screen">
   <div class="top">
     <h1>관리자 대시보드 <span class="badge">전체 보기</span></h1>
-    <button id="logoutBtn">로그아웃</button>
+    <div class="top-right">
+      <div class="update-dropdown-wrap">
+        <button class="bell-btn" id="bellBtn">🔔<span class="bell-badge" id="bellBadge"></span></button>
+        <div class="update-dropdown" id="updateDropdown">
+          <div class="update-title">업데이트 내역</div>
+          <div id="updateList"></div>
+        </div>
+      </div>
+      <button id="logoutBtn">로그아웃</button>
+    </div>
   </div>
 
   <div class="stat-row" id="statRow" style="margin-bottom:14px"></div>
+
+  <div class="card">
+    <div class="card-title">시스템 공지 등록 (모든 교수/학생에게 표시)</div>
+    <div class="row">
+      <input type="text" id="sysNoticeInput" placeholder="예: 9/10 새벽 서버 업그레이드 예정">
+      <button id="postSysNoticeBtn">등록</button>
+    </div>
+    <div class="msg" id="sysNoticeMsg"></div>
+    <div id="sysNoticeList" class="empty" style="margin-top:10px">불러오는 중...</div>
+  </div>
 
   <div class="card">
     <div class="card-title">전체 교수</div>
@@ -56,11 +96,77 @@ th, td { text-align:left; padding:6px 4px; border-bottom:1px solid #eee; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script>
+const APP_UPDATES = [
+  { date: '2026-09-09', text: '그룹 가입 코드가 숫자 4자리 방식으로 변경되었습니다.' },
+  { date: '2026-09-01', text: '교수 가입 시 이메일 인증 기능이 추가되었습니다.' },
+];
+(function(){
+  const lastSeen = localStorage.getItem('updateLastSeen') || '1970-01-01';
+  const unread = APP_UPDATES.filter(u => u.date > lastSeen);
+  const badge = document.getElementById('bellBadge');
+  const dropdown = document.getElementById('updateDropdown');
+  const bell = document.getElementById('bellBtn');
+  const list = document.getElementById('updateList');
+  if(unread.length > 0){ badge.textContent = unread.length > 9 ? '9+' : String(unread.length); badge.classList.add('show'); }
+  list.innerHTML = APP_UPDATES.map(u => `<div class="update-item"><div class="u-date">${u.date}</div><div class="u-text">${u.text}</div></div>`).join('');
+  bell.addEventListener('click', e => {
+    e.stopPropagation();
+    if(!dropdown.classList.contains('show')){
+      localStorage.setItem('updateLastSeen', new Date().toISOString().slice(0,10));
+      badge.classList.remove('show');
+    }
+    dropdown.classList.toggle('show');
+  });
+  document.addEventListener('click', () => dropdown.classList.remove('show'));
+})();
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+async function loadSysNotices() {
+  const { data } = await Api.systemNotices();
+  const el = document.getElementById('sysNoticeList');
+  if (!data || data.length === 0) { el.textContent = '등록된 시스템 공지가 없습니다.'; return; }
+  el.innerHTML = data.map(n => `
+    <div style="border-bottom:1px solid #eee; padding:8px 0;">
+      <div style="font-size:14px;">${escapeHtml(n.content)}</div>
+      <div style="font-size:11px; color:#999; margin-top:4px; display:flex; justify-content:space-between;">
+        <span>${new Date(n.created_at).toLocaleString('ko-KR')}</span>
+        <button class="del-sys-notice-btn" data-id="${n.id}" style="font-size:11px; color:#999; background:none; border:none; cursor:pointer;">삭제</button>
+      </div>
+    </div>
+  `).join('');
+  el.querySelectorAll('.del-sys-notice-btn').forEach(b => {
+    b.addEventListener('click', async () => {
+      if (!confirm('이 시스템 공지를 삭제하시겠습니까?')) return;
+      await Api.deleteNotice(b.dataset.id);
+      loadSysNotices();
+    });
+  });
+}
+
+document.getElementById('postSysNoticeBtn').addEventListener('click', async () => {
+  const input = document.getElementById('sysNoticeInput');
+  const content = input.value.trim();
+  const msgEl = document.getElementById('sysNoticeMsg');
+  msgEl.className = 'msg';
+  if (!content) return;
+  const { error } = await Api.createSystemNotice(content);
+  if (error) { msgEl.textContent = error.message; msgEl.classList.add('err'); return; }
+  input.value = '';
+  msgEl.textContent = '시스템 공지가 등록되었습니다.';
+  msgEl.classList.add('ok');
+  await loadSysNotices();
+});
+
 async function init() {
   const session = await Auth.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
   const role = await Auth.getRole(session.user.id);
   if (role !== 'admin') { window.location.href = 'index.html'; return; }
+
+  await loadSysNotices();
 
   const [{ data: profs }, { data: groups }, { data: students }, { data: exams }] = await Promise.all([
     Api.adminAllProfessors(), Api.adminAllGroups(), Api.adminAllStudents(), Api.adminAllExamsWithAttemptCount()
