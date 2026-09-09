@@ -8,8 +8,14 @@
 -- 그룹이 있다면, 이 마이그레이션 실행 전에 지우거나 숫자 4자리로 갱신해두세요.
 -- 예: delete from greek_quiz.groups where join_code !~ '^[0-9]{4}$';
 
-alter table greek_quiz.groups
-  add constraint groups_join_code_format check (join_code ~ '^[0-9]{4}$');
+-- 다시 실행해도 안전하도록 이미 있으면 건너뜁니다.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'groups_join_code_format') then
+    alter table greek_quiz.groups
+      add constraint groups_join_code_format check (join_code ~ '^[0-9]{4}$');
+  end if;
+end $$;
 
 -- join_code에 대한 unique 제약은 원래 스키마에 이미 있어야 합니다(없다면 아래 실행):
 -- alter table greek_quiz.groups add constraint groups_join_code_unique unique (join_code);

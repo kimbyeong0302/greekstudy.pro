@@ -107,6 +107,28 @@ const Api = {
   async setExamActive(examId, active) {
     return sb.from('exams').update({ active }).eq('id', examId);
   },
+  // 그룹 삭제 (RLS가 본인 그룹인지 확인. group_members/exams/attempts/notices는
+  // 전부 group_id에 ON DELETE CASCADE가 걸려있어 함께 정리됩니다)
+  async deleteGroup(groupId) {
+    return sb.from('groups').delete().eq('id', groupId);
+  },
+  // 그룹 총 인원 수
+  async groupMemberCount(groupId) {
+    const { count, error } = await sb.from('group_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('group_id', groupId);
+    return { count: count || 0, error };
+  },
+  // 그룹 공지사항
+  async groupNotices(groupId) {
+    return sb.from('notices').select('*').eq('scope', 'group').eq('group_id', groupId).order('created_at', { ascending: false });
+  },
+  async createGroupNotice(groupId, content) {
+    return sb.from('notices').insert({ scope: 'group', group_id: groupId, content });
+  },
+  async deleteNotice(noticeId) {
+    return sb.from('notices').delete().eq('id', noticeId);
+  },
 
   // ---- 학생용 ----
   async joinGroupByCode(code) {
@@ -126,6 +148,18 @@ const Api = {
   },
   async wordsForWeeks(weeks) {
     return sb.from('words').select('*').in('week', weeks);
+  },
+  // 시스템 전체 공지 (관리자가 등록, 모든 로그인 사용자가 조회 가능)
+  async systemNotices() {
+    return sb.from('notices').select('*').eq('scope', 'system').order('created_at', { ascending: false });
+  },
+  async createSystemNotice(content) {
+    return sb.from('notices').insert({ scope: 'system', content });
+  },
+  // 학생이 속한 그룹들의 공지 (그룹명 포함)
+  async noticesForGroups(groupIds) {
+    if (!groupIds || groupIds.length === 0) return { data: [], error: null };
+    return sb.from('notices').select('*, groups(name)').eq('scope', 'group').in('group_id', groupIds).order('created_at', { ascending: false });
   },
   async submitAttempt(examId, studentId, score, total, wrongAnswers) {
     return sb.from('attempts').insert({
