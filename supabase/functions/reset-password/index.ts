@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     const { userId } = await req.json();
     if (!userId) throw new Error("userId가 필요합니다.");
 
-    const { error: resetErr } = await sb.auth.admin.updateUserById(userId, { password: "0000" });
+    const { error: resetErr } = await sb.auth.admin.updateUserById(userId, { password: "000000" });
     if (resetErr) throw new Error("초기화 실패: " + resetErr.message);
 
     return new Response(JSON.stringify({ ok: true }), {
