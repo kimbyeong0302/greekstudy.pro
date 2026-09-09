@@ -47,8 +47,10 @@ th, td { text-align:left; padding:6px 4px; border-bottom:1px solid #eee; }
     <div class="card-title">새 그룹(과목) 만들기</div>
     <div class="row">
       <input type="text" id="groupNameInput" placeholder="예: 헬라어 1 (2026-2)">
+      <input type="text" id="groupCodeInput" placeholder="가입 코드 4자리" maxlength="4" inputmode="numeric" style="flex:0 0 110px">
       <button id="createGroupBtn">생성</button>
     </div>
+    <div class="msg" id="groupMsg"></div>
   </div>
 
   <div class="card">
@@ -129,10 +131,21 @@ function selectGroup(groupId) {
 
 document.getElementById('createGroupBtn').addEventListener('click', async () => {
   const name = document.getElementById('groupNameInput').value.trim();
-  if (!name) return;
-  const { error } = await Api.createGroup(me.id, name);
-  if (error) { alert(error.message); return; }
+  const code = document.getElementById('groupCodeInput').value.trim();
+  const msgEl = document.getElementById('groupMsg');
+  msgEl.className = 'msg'; msgEl.textContent = '';
+  if (!name) { msgEl.textContent = '그룹 이름을 입력해주세요.'; msgEl.classList.add('err'); return; }
+  if (!/^\d{4}$/.test(code)) { msgEl.textContent = '가입 코드는 숫자 4자리로 입력해주세요.'; msgEl.classList.add('err'); return; }
+  const { error } = await Api.createGroup(me.id, name, code);
+  if (error) {
+    // 코드 중복(unique 제약 위반)인 경우 알기 쉬운 안내로 바꿔서 보여줍니다.
+    const dup = error.code === '23505' || (error.message || '').toLowerCase().includes('duplicate');
+    msgEl.textContent = dup ? '이미 사용 중인 코드입니다. 다른 숫자 4자리를 입력해주세요.' : error.message;
+    msgEl.classList.add('err');
+    return;
+  }
   document.getElementById('groupNameInput').value = '';
+  document.getElementById('groupCodeInput').value = '';
   await loadGroups();
 });
 
