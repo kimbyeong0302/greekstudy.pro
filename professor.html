@@ -3,11 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <title>교수 대시보드</title>
-<script>(function(){var v='2026-09-09-1',s=localStorage.getItem('appVersion');if(s&&s!==v){localStorage.setItem('appVersion',v);location.reload(true);}else localStorage.setItem('appVersion',v);})();</script>
 <style>
 * { box-sizing: border-box; }
 body { margin:0; font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; background:#f4f1ea; color:#222; }
@@ -38,34 +34,13 @@ th, td { text-align:left; padding:6px 4px; border-bottom:1px solid #eee; }
 .empty { color:#999; font-size:13px; text-align:center; padding:12px 0; }
 .msg { font-size:12px; margin-top:6px; }
 .msg.ok { color:#2e9e4f; } .msg.err { color:#d64545; }
-.top-right{display:flex;align-items:center;gap:8px;}
-.bell-btn{position:relative;background:none;border:none;cursor:pointer;padding:4px 6px;font-size:20px;line-height:1;}
-.bell-badge{position:absolute;top:-2px;right:-2px;background:#e53e3e;color:#fff;border-radius:999px;font-size:10px;font-weight:700;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;display:none;}
-.bell-badge.show{display:block;}
-.update-dropdown-wrap{position:relative;}
-.update-dropdown{position:absolute;top:calc(100% + 6px);right:0;width:270px;background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14px;z-index:100;display:none;}
-.update-dropdown.show{display:block;}
-.update-title{font-size:11px;font-weight:700;color:#aaa;letter-spacing:0.8px;text-transform:uppercase;margin:0 0 10px;}
-.update-item{padding:8px 0;border-bottom:1px solid #f0ede6;}
-.update-item:last-child{border-bottom:none;padding-bottom:0;}
-.u-date{font-size:11px;color:#aaa;margin-bottom:2px;}
-.u-text{font-size:13px;color:#333;line-height:1.5;}
 </style>
 </head>
 <body>
 <div class="screen">
   <div class="top">
     <h1>교수 대시보드</h1>
-    <div class="top-right">
-      <div class="update-dropdown-wrap">
-        <button class="bell-btn" id="bellBtn">🔔<span class="bell-badge" id="bellBadge"></span></button>
-        <div class="update-dropdown" id="updateDropdown">
-          <div class="update-title">업데이트 내역</div>
-          <div id="updateList"></div>
-        </div>
-      </div>
-      <button id="logoutBtn">로그아웃</button>
-    </div>
+    <button id="logoutBtn">로그아웃</button>
   </div>
 
   <div class="card">
@@ -123,30 +98,6 @@ th, td { text-align:left; padding:6px 4px; border-bottom:1px solid #eee; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script>
-const APP_UPDATES = [
-  { date: '2026-09-09', text: '그룹 가입 코드가 숫자 4자리 방식으로 변경되었습니다.' },
-  { date: '2026-09-01', text: '교수 가입 시 이메일 인증 기능이 추가되었습니다.' },
-];
-(function(){
-  const lastSeen = localStorage.getItem('updateLastSeen') || '1970-01-01';
-  const unread = APP_UPDATES.filter(u => u.date > lastSeen);
-  const badge = document.getElementById('bellBadge');
-  const dropdown = document.getElementById('updateDropdown');
-  const bell = document.getElementById('bellBtn');
-  const list = document.getElementById('updateList');
-  if(unread.length > 0){ badge.textContent = unread.length > 9 ? '9+' : String(unread.length); badge.classList.add('show'); }
-  list.innerHTML = APP_UPDATES.map(u => `<div class="update-item"><div class="u-date">${u.date}</div><div class="u-text">${u.text}</div></div>`).join('');
-  bell.addEventListener('click', e => {
-    e.stopPropagation();
-    if(!dropdown.classList.contains('show')){
-      localStorage.setItem('updateLastSeen', new Date().toISOString().slice(0,10));
-      badge.classList.remove('show');
-    }
-    dropdown.classList.toggle('show');
-  });
-  document.addEventListener('click', () => dropdown.classList.remove('show'));
-})();
-
 let me = null;
 let groups = [];
 let selectedGroupId = null;
@@ -178,7 +129,17 @@ async function loadGroups() {
   const { data } = await Api.myGroups(me.id);
   groups = data || [];
   const el = document.getElementById('groupList');
-  if (groups.length === 0) { el.textContent = '아직 만든 그룹이 없습니다.'; return; }
+  if (groups.length === 0) {
+    el.textContent = '아직 만든 그룹이 없습니다. 위에서 그룹을 먼저 만들어주세요.';
+    selectedGroupId = null;
+    hideGroupPanels();
+    return;
+  }
+  // 선택된 그룹이 없으면(첫 로딩 시 등) 첫 번째 그룹을 자동으로 선택합니다.
+  // — 그룹을 눌러야만 공지사항 등록 칸이 보이는 게 아니라, 그룹이 있으면 바로 보이게 합니다.
+  if (!selectedGroupId || !groups.some(g => g.id === selectedGroupId)) {
+    selectedGroupId = groups[0].id;
+  }
   const counts = await Promise.all(groups.map(g => Api.groupMemberCount(g.id)));
   el.innerHTML = '';
   groups.forEach((g, i) => {
@@ -194,6 +155,24 @@ async function loadGroups() {
     `;
     el.appendChild(div);
   });
+  showGroupPanels(selectedGroupId);
+}
+
+function hideGroupPanels() {
+  document.getElementById('examSetupCard').style.display = 'none';
+  document.getElementById('examListCard').style.display = 'none';
+  document.getElementById('memberListCard').style.display = 'none';
+  document.getElementById('noticeCard').style.display = 'none';
+}
+
+function showGroupPanels(groupId) {
+  document.getElementById('examSetupCard').style.display = 'block';
+  document.getElementById('examListCard').style.display = 'block';
+  document.getElementById('memberListCard').style.display = 'block';
+  document.getElementById('noticeCard').style.display = 'block';
+  loadExams();
+  loadMembers(groupId);
+  loadNotices(groupId);
 }
 
 document.getElementById('groupList').addEventListener('click', async (e) => {
@@ -205,13 +184,7 @@ document.getElementById('groupList').addEventListener('click', async (e) => {
     if (!ok) return;
     const { error } = await Api.deleteGroup(delBtn.dataset.id);
     if (error) { alert(error.message); return; }
-    if (selectedGroupId === delBtn.dataset.id) {
-      selectedGroupId = null;
-      document.getElementById('examSetupCard').style.display = 'none';
-      document.getElementById('examListCard').style.display = 'none';
-      document.getElementById('memberListCard').style.display = 'none';
-      document.getElementById('noticeCard').style.display = 'none';
-    }
+    if (selectedGroupId === delBtn.dataset.id) selectedGroupId = null;
     await loadGroups();
     return;
   }
@@ -221,14 +194,7 @@ document.getElementById('groupList').addEventListener('click', async (e) => {
 
 function selectGroup(groupId) {
   selectedGroupId = groupId;
-  document.getElementById('examSetupCard').style.display = 'block';
-  document.getElementById('examListCard').style.display = 'block';
-  document.getElementById('memberListCard').style.display = 'block';
-  document.getElementById('noticeCard').style.display = 'block';
   loadGroups();
-  loadExams();
-  loadMembers(groupId);
-  loadNotices(groupId);
 }
 
 async function loadMembers(groupId) {
@@ -288,15 +254,14 @@ document.getElementById('createGroupBtn').addEventListener('click', async () => 
   if (!/^\d{4}$/.test(code)) { msgEl.textContent = '가입 코드는 숫자 4자리로 입력해주세요.'; msgEl.classList.add('err'); return; }
   const { error } = await Api.createGroup(me.id, name, code);
   if (error) {
+    // 코드 중복(unique 제약 위반)인 경우 알기 쉬운 안내로 바꿔서 보여줍니다.
     const dup = error.code === '23505' || (error.message || '').toLowerCase().includes('duplicate');
-    msgEl.textContent = dup ? '이미 사용 중인 코드입니다. 다른 숫자 4자리를 입력해주세요.' : (error.message || '그룹 생성에 실패했습니다.');
+    msgEl.textContent = dup ? '이미 사용 중인 코드입니다. 다른 숫자 4자리를 입력해주세요.' : error.message;
     msgEl.classList.add('err');
     return;
   }
   document.getElementById('groupNameInput').value = '';
   document.getElementById('groupCodeInput').value = '';
-  msgEl.textContent = '그룹이 생성되었습니다.';
-  msgEl.classList.add('ok');
   await loadGroups();
 });
 
