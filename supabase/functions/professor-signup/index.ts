@@ -62,11 +62,26 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: FROM_ADDRESS,
         to: email,
-        subject: "[헬라어 단어 시험] 이메일 인증을 완료해주세요",
-        html: `<p>안녕하세요 ${name}님,</p>
-               <p>헬라어 단어 시험 교수 계정 가입을 완료하려면 아래 버튼을 눌러 이메일 인증을 완료해주세요.</p>
-               <p><a href="${link}" style="display:inline-block;padding:12px 20px;background:#2e6ed6;color:#fff;text-decoration:none;border-radius:8px;">이메일 인증하기</a></p>
-               <p>버튼이 안 눌리면 이 링크를 브라우저에 붙여넣어주세요: ${link}</p>`
+        subject: "[토블.kr] 이메일 인증을 완료해주세요",
+        html: `
+<div style="font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;max-width:480px;margin:0 auto;padding:40px 24px;background:#fff;">
+  <p style="margin:0 0 4px;font-size:13px;color:#999;letter-spacing:0.5px;">토블.kr</p>
+  <h2 style="margin:0 0 24px;font-size:22px;font-weight:700;color:#222;">이메일 인증</h2>
+  <p style="margin:0 0 16px;font-size:15px;color:#333;">안녕하세요, <strong>${name}</strong>님 👋</p>
+  <p style="margin:0 0 28px;font-size:15px;color:#444;line-height:1.7;">
+    헬라어 단어 시험 교수 계정 가입이 거의 완료되었습니다.<br>
+    아래 버튼을 클릭하면 이메일 인증이 완료되고 바로 로그인하실 수 있습니다.
+  </p>
+  <div style="text-align:center;margin:0 0 32px;">
+    <a href="${link}" style="display:inline-block;padding:14px 36px;background:#2e6ed6;color:#fff;text-decoration:none;border-radius:12px;font-size:15px;font-weight:700;letter-spacing:0.2px;">
+      이메일 인증 완료하기
+    </a>
+  </div>
+  <p style="margin:0 0 6px;font-size:12px;color:#aaa;">버튼이 클릭되지 않는 경우, 아래 링크를 복사해 브라우저에 붙여넣어 주세요.</p>
+  <p style="margin:0 0 32px;font-size:12px;color:#bbb;word-break:break-all;">${link}</p>
+  <hr style="border:none;border-top:1px solid #eee;margin:0 0 20px;">
+  <p style="margin:0;font-size:12px;color:#ccc;">본인이 요청하지 않은 경우 이 메일을 무시하셔도 됩니다. — 토블.kr</p>
+</div>`
       })
     });
 
